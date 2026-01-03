@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* (opcional, mas recomendado) base mínima para evitar “body flex” do template */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
