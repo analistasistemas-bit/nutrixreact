@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark, .dark *));
+
+@theme {
+  --color-bg-primary: #0F172A;
+  --color-bg-secondary: #111827;
+  --color-bg-tertiary: #1F2937;
+  --color-bg-elevated: #1E293B;
+  --color-bg-hover: #334155;
+
+  --color-text-primary: #F9FAFB;
+  --color-text-secondary: #D1D5DB;
+  --color-text-muted: #9CA3AF;
+  --color-text-disabled: #6B7280;
+
+  --color-border-subtle: #334155;
+  --color-border-strong: #475569;
+}
+
+@layer base {
+  html {
+    height: 100%;
+  }
+
+  body {
+    height: 100%;
+    margin: 0;
+    @apply bg-zinc-50 text-zinc-900 transition-colors duration-300;
+  }
+
+  html.dark body {
+    @apply bg-bg-primary text-text-primary;
+  }
+
+  /* Custom Scrollbar for Dark Mode */
+  .dark ::-webkit-scrollbar-track {
+    @apply bg-bg-secondary;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-bg-tertiary hover:bg-bg-hover;
+  }
+}
