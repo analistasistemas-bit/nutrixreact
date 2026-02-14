@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Bell, ChevronDown, User, Settings, LogOut, Menu, X, Check, Moon, Sun } from 'lucide-react';
 import { tabs } from '../data/tabs';
 import { useGamification } from '../hooks/useGamification';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../hooks/useTheme';
 import NutrixoIcon from '../assets/nutrixo-icon-v2.png';
 
 const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMarkAllRead }) => {
@@ -73,10 +73,13 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                         <div className="hidden lg:flex items-center space-x-5">
 
 
-                            <div className="relative">
+                            <div
+                                className="relative"
+                                onMouseLeave={() => setShowProfileMenu(false)}
+                            >
                                 <button
                                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                    className="flex items-center space-x-2 p-1 pl-2 pr-3 rounded-full hover:bg-gray-50 transition-all border border-transparent hover:border-gray-200"
+                                    className="flex items-center space-x-2 p-1 pl-2 pr-3 rounded-full hover:bg-slate-100/50 dark:hover:bg-zinc-800/80 transition-all border border-transparent hover:border-zinc-200 dark:hover:border-border-subtle"
                                 >
                                     <div className="relative w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white">
                                         {unreadCount > 0 && (
@@ -97,121 +100,126 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                 {/* Desktop Dropdown */}
                                 <AnimatePresence>
                                     {showProfileMenu && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="absolute right-0 mt-3 w-72 bg-white/80 dark:bg-bg-elevated backdrop-blur-xl rounded-2xl shadow-xl border border-zinc-100 dark:border-border-subtle overflow-hidden z-[60] origin-top-right"
+                                        <div
+                                            className="absolute right-0 top-full pt-2 z-[60]"
+                                            onMouseLeave={() => setShowProfileMenu(false)}
                                         >
-                                            <div className="p-5 border-b border-zinc-50 dark:border-border-subtle bg-gradient-to-br from-zinc-50 to-white dark:from-bg-secondary dark:to-bg-tertiary">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-                                                        {user.name.charAt(0)}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-bold text-gray-900 dark:text-text-primary">{user.name}</p>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex items-center space-x-1 bg-white dark:bg-zinc-800 border border-cyan-100 dark:border-cyan-900/50 rounded-full px-1.5 py-0.5">
-                                                                <span className="text-xs">{petStage.emoji}</span>
-                                                                <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-400">Lv.{level}</span>
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="w-72 bg-white/80 dark:bg-bg-elevated backdrop-blur-xl rounded-2xl shadow-xl border border-zinc-100 dark:border-border-subtle overflow-hidden origin-top-right"
+                                            >
+                                                <div className="p-5 border-b border-zinc-50 dark:border-border-subtle bg-gradient-to-br from-zinc-50 to-white dark:from-bg-secondary dark:to-bg-tertiary">
+                                                    <div className="flex items-center space-x-3">
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                                                            {user.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-text-primary">{user.name}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex items-center space-x-1 bg-white dark:bg-zinc-800 border border-cyan-100 dark:border-cyan-900/50 rounded-full px-1.5 py-0.5">
+                                                                    <span className="text-xs">{petStage.emoji}</span>
+                                                                    <span className="text-[10px] font-bold text-cyan-700 dark:text-cyan-400">Lv.{level}</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="p-2 space-y-1">
-                                                <button
-                                                    onClick={() => {
-                                                        setShowNotifications(!showNotifications);
-                                                    }}
-                                                    className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-xl transition-colors group justify-between"
-                                                >
-                                                    <div className="flex items-center space-x-3">
-                                                        <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-white group-hover:shadow-sm transition-all relative">
-                                                            <Bell className="w-4 h-4 text-gray-500 dark:text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
-                                                            {unreadCount > 0 && !showNotifications && (
-                                                                <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full ring-1 ring-white"></span>
-                                                            )}
-                                                        </div>
-                                                        <span>Notificações</span>
-                                                    </div>
-                                                    {unreadCount > 0 && (
-                                                        <span className="bg-red-50 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                                                            {unreadCount}
-                                                        </span>
-                                                    )}
-                                                </button>
-
-                                                {/* Inline Notifications List within Menu */}
-                                                <AnimatePresence>
-                                                    {showNotifications && (
-                                                        <motion.div
-                                                            initial={{ height: 0, opacity: 0 }}
-                                                            animate={{ height: 'auto', opacity: 1 }}
-                                                            exit={{ height: 0, opacity: 0 }}
-                                                            className="overflow-hidden bg-zinc-50/50 dark:bg-zinc-800/50 rounded-xl mb-1"
-                                                        >
-                                                            <div className="px-2 py-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                                                                {notifications.length === 0 ? (
-                                                                    <div className="p-4 text-center text-xs text-gray-400 dark:text-slate-500">Sem notificações.</div>
-                                                                ) : (
-                                                                    notifications.map(n => (
-                                                                        <div key={n.id} onClick={() => handleNotificationClick(n.id, n.target)} className="py-2 border-b border-gray-100 last:border-0 cursor-pointer">
-                                                                            <div className="flex items-center justify-between">
-                                                                                <span className={`text-xs ${!n.read ? 'font-bold text-gray-800 dark:text-slate-200' : 'text-gray-500 dark:text-slate-400'}`}>{n.title}</span>
-                                                                                <span className="text-[10px] text-gray-400 dark:text-slate-500">{n.time}</span>
-                                                                            </div>
-                                                                            <p className="text-[10px] text-gray-400 line-clamp-1">{n.description}</p>
-                                                                        </div>
-                                                                    ))
-                                                                )}
-                                                                {unreadCount > 0 && (
-                                                                    <button onClick={onMarkAllRead} className="w-full text-center text-[10px] text-cyan-600 dark:text-cyan-400 font-bold py-2 mt-1 border-t border-gray-200 dark:border-slate-700">
-                                                                        Marcar todas como lidas
-                                                                    </button>
+                                                <div className="p-2 space-y-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowNotifications(!showNotifications);
+                                                        }}
+                                                        className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group justify-between"
+                                                    >
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg group-hover:bg-white dark:group-hover:bg-zinc-700 group-hover:shadow-sm transition-all relative">
+                                                                <Bell className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                                                                {unreadCount > 0 && !showNotifications && (
+                                                                    <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full ring-1 ring-white"></span>
                                                                 )}
                                                             </div>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-                                                <button className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-xl transition-colors group">
-                                                    <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-white group-hover:shadow-sm transition-all">
-                                                        <User className="w-4 h-4 text-gray-500 dark:text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
-                                                    </div>
-                                                    <span>Meu Perfil</span>
-                                                </button>
-                                                <button className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors group">
-                                                    <div className="p-1.5 bg-gray-100 dark:bg-slate-700 rounded-lg group-hover:bg-white dark:group-hover:bg-slate-600 group-hover:shadow-sm transition-all">
-                                                        <Settings className="w-4 h-4 text-gray-500 dark:text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
-                                                    </div>
-                                                    <span>Configurações</span>
-                                                </button>
-                                                <button
-                                                    onClick={toggleTheme}
-                                                    className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl transition-colors group"
-                                                >
-                                                    <div className="p-1.5 bg-gray-100 dark:bg-slate-700 rounded-lg group-hover:bg-white dark:group-hover:bg-slate-600 group-hover:shadow-sm transition-all">
-                                                        {theme === 'dark' ? (
-                                                            <Sun className="w-4 h-4 text-gray-500 dark:text-slate-400 group-hover:text-yellow-500" />
-                                                        ) : (
-                                                            <Moon className="w-4 h-4 text-gray-500 dark:text-slate-400 group-hover:text-indigo-600" />
+                                                            <span>Notificações</span>
+                                                        </div>
+                                                        {unreadCount > 0 && (
+                                                            <span className="bg-red-50 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                                                {unreadCount}
+                                                            </span>
                                                         )}
-                                                    </div>
-                                                    <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
-                                                </button>
-                                                <div className="h-px bg-gray-100 dark:bg-slate-800 my-1 mx-2"></div>
-                                                <button
-                                                    onClick={onLogout}
-                                                    className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors group"
-                                                >
-                                                    <div className="p-1.5 bg-red-50 rounded-lg group-hover:bg-white group-hover:shadow-sm transition-all">
-                                                        <LogOut className="w-4 h-4 text-red-500" />
-                                                    </div>
-                                                    <span>Sair da Conta</span>
-                                                </button>
-                                            </div>
-                                        </motion.div>
+                                                    </button>
+
+                                                    {/* Inline Notifications List within Menu */}
+                                                    <AnimatePresence>
+                                                        {showNotifications && (
+                                                            <motion.div
+                                                                initial={{ height: 0, opacity: 0 }}
+                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                exit={{ height: 0, opacity: 0 }}
+                                                                className="overflow-hidden bg-zinc-50/50 dark:bg-zinc-800/50 rounded-xl mb-1"
+                                                            >
+                                                                <div className="px-2 py-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                                                    {notifications.length === 0 ? (
+                                                                        <div className="p-4 text-center text-xs text-gray-400 dark:text-slate-500">Sem notificações.</div>
+                                                                    ) : (
+                                                                        notifications.map(n => (
+                                                                            <div key={n.id} onClick={() => handleNotificationClick(n.id, n.target)} className="py-2 border-b border-gray-100 last:border-0 cursor-pointer">
+                                                                                <div className="flex items-center justify-between">
+                                                                                    <span className={`text-xs ${!n.read ? 'font-bold text-gray-800 dark:text-slate-200' : 'text-gray-500 dark:text-slate-400'}`}>{n.title}</span>
+                                                                                    <span className="text-[10px] text-gray-400 dark:text-slate-500">{n.time}</span>
+                                                                                </div>
+                                                                                <p className="text-[10px] text-gray-400 line-clamp-1">{n.description}</p>
+                                                                            </div>
+                                                                        ))
+                                                                    )}
+                                                                    {unreadCount > 0 && (
+                                                                        <button onClick={onMarkAllRead} className="w-full text-center text-[10px] text-cyan-600 dark:text-cyan-400 font-bold py-2 mt-1 border-t border-gray-200 dark:border-slate-700">
+                                                                            Marcar todas como lidas
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                    <button className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group">
+                                                        <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg group-hover:bg-white dark:group-hover:bg-zinc-700 group-hover:shadow-sm transition-all">
+                                                            <User className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                                                        </div>
+                                                        <span>Meu Perfil</span>
+                                                    </button>
+                                                    <button className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group">
+                                                        <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg group-hover:bg-white dark:group-hover:bg-zinc-700 group-hover:shadow-sm transition-all">
+                                                            <Settings className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                                                        </div>
+                                                        <span>Configurações</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={toggleTheme}
+                                                        className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group"
+                                                    >
+                                                        <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg group-hover:bg-white dark:group-hover:bg-zinc-700 group-hover:shadow-sm transition-all">
+                                                            {theme === 'dark' ? (
+                                                                <Sun className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-yellow-500" />
+                                                            ) : (
+                                                                <Moon className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-indigo-600" />
+                                                            )}
+                                                        </div>
+                                                        <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
+                                                    </button>
+                                                    <div className="h-px bg-gray-100 dark:bg-slate-800 my-1 mx-2"></div>
+                                                    <button
+                                                        onClick={onLogout}
+                                                        className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors group"
+                                                    >
+                                                        <div className="p-1.5 bg-red-50 dark:bg-red-900/40 rounded-lg group-hover:bg-white dark:group-hover:bg-red-900/60 group-hover:shadow-sm transition-all">
+                                                            <LogOut className="w-4 h-4 text-red-500" />
+                                                        </div>
+                                                        <span>Sair da Conta</span>
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        </div>
                                     )}
                                 </AnimatePresence>
                             </div>
@@ -391,29 +399,29 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                 </div>
 
                                 <div className="space-y-3">
-                                    <button className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-4 rounded-xl flex items-center space-x-4 text-gray-700 dark:text-slate-200 font-bold active:scale-95 transition-all hover:bg-gray-50 dark:hover:bg-slate-750 hover:border-cyan-200 shadow-sm">
+                                    <button className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex items-center space-x-4 text-zinc-700 dark:text-zinc-200 font-bold active:scale-95 transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 hover:border-cyan-200 shadow-sm">
                                         <div className="p-2 bg-cyan-50 dark:bg-cyan-900/30 rounded-lg text-cyan-600 dark:text-cyan-400">
                                             <User className="w-5 h-5" />
                                         </div>
                                         <span>Ver Perfil Completo</span>
-                                        <ChevronDown className="w-5 h-5 ml-auto -rotate-90 text-gray-300 dark:text-slate-600" />
+                                        <ChevronDown className="w-5 h-5 ml-auto -rotate-90 text-zinc-300 dark:text-zinc-600" />
                                     </button>
-                                    <button className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-4 rounded-xl flex items-center space-x-4 text-gray-700 dark:text-slate-200 font-bold active:scale-95 transition-all hover:bg-gray-50 dark:hover:bg-slate-750 hover:border-cyan-200 shadow-sm">
+                                    <button className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex items-center space-x-4 text-zinc-700 dark:text-zinc-200 font-bold active:scale-95 transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 hover:border-cyan-200 shadow-sm">
                                         <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
                                             <Settings className="w-5 h-5" />
                                         </div>
                                         <span>Configurações</span>
-                                        <ChevronDown className="w-5 h-5 ml-auto -rotate-90 text-gray-300 dark:text-slate-600" />
+                                        <ChevronDown className="w-5 h-5 ml-auto -rotate-90 text-zinc-300 dark:text-zinc-600" />
                                     </button>
                                     <button
                                         onClick={toggleTheme}
-                                        className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-4 rounded-xl flex items-center space-x-4 text-gray-700 dark:text-slate-200 font-bold active:scale-95 transition-all hover:bg-gray-50 dark:hover:bg-slate-750 hover:border-cyan-200 shadow-sm"
+                                        className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex items-center space-x-4 text-zinc-700 dark:text-zinc-200 font-bold active:scale-95 transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 hover:border-cyan-200 shadow-sm"
                                     >
                                         <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' : 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
                                             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                                         </div>
                                         <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
-                                        <ChevronDown className="w-5 h-5 ml-auto -rotate-90 text-gray-300 dark:text-slate-600" />
+                                        <ChevronDown className="w-5 h-5 ml-auto -rotate-90 text-zinc-300 dark:text-zinc-600" />
                                     </button>
                                 </div>
 

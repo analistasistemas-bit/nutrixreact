@@ -1,7 +1,6 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { useGamification } from '../../hooks/useGamification';
-import { getLevelTitle } from '../../data/gamificationData';
 
 const XPBar = ({ compact = false }) => {
     const { level, levelProgress, totalXP, levelTitle, petStage } = useGamification();

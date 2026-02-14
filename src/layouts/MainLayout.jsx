@@ -6,7 +6,7 @@ import Chatbot from '../components/Chatbot';
 import AchievementToast from '../components/gamification/AchievementToast';
 import LevelUpModal from '../components/gamification/LevelUpModal';
 import { useNotifications } from '../hooks/useNotifications';
-import { GamificationProvider } from '../hooks/useGamification';
+import { GamificationProvider } from '../contexts/GamificationContext';
 
 const MainLayout = ({ user, onLogout }) => {
     const { notifications, unreadCount, markNotificationAsRead, markAllNotificationsAsRead } = useNotifications();

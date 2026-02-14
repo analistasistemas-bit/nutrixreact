@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Trophy, Target, Flame, Star, Shield, Crown, ChevronUp, Medal } from 'lucide-react';
 import { useGamification } from '../hooks/useGamification';
-import { ACHIEVEMENTS, LEADERBOARD_DATA, PET_STAGES, calculateLevelProgress, getLevelTitle } from '../data/gamificationData';
+import { ACHIEVEMENTS, LEADERBOARD_DATA, PET_STAGES, getLevelTitle } from '../data/gamificationData';
 import PetWidget from '../components/gamification/PetWidget';
 import XPBar from '../components/gamification/XPBar';
 import StreakCounter from '../components/gamification/StreakCounter';
@@ -281,7 +281,7 @@ const GamerProfile = () => {
                         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
                             <h3 className="font-bold text-gray-900 text-sm mb-4">🗺️ Caminho da Evolução</h3>
                             <div className="space-y-3">
-                                {PET_STAGES.map((stage, i) => {
+                                {PET_STAGES.map((stage) => {
                                     const isActive = petStage.id === stage.id;
                                     const isUnlocked = level >= stage.minLevel;
                                     return (

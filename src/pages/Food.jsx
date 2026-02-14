@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Camera, Mic, Scan, Loader2, AlertTriangle, CheckCircle, RefreshCw, UtensilsCrossed, X, MicOff } from 'lucide-react';
 import { useGamification } from '../hooks/useGamification';
 import { analyzeFoodPhoto, analyzeFoodDescription } from '../services/aiService';

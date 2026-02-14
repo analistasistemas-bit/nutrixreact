@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { ChartLine, Database, Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Loader2 } from 'lucide-react';
 import { getExamHistory } from '../services/aiService';
 
@@ -8,31 +8,34 @@ const Progress = () => {
     const [exams, setExams] = useState([]);
     const [selectedBiomarker, setSelectedBiomarker] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [selectedPeriod, setSelectedPeriod] = useState('all');
 
     useEffect(() => {
+        const loadExams = async () => {
+            setIsLoading(true);
+            try {
+                const data = await getExamHistory();
+                setExams(data);
+
+                // Auto-select first biomarker if available
+                if (data.length > 0) {
+                    const nameSet = new Set();
+                    data.forEach(exam => {
+                        exam.analysis?.biomarkers?.forEach(b => nameSet.add(b.name));
+                    });
+                    const allBiomarkersList = Array.from(nameSet);
+                    if (allBiomarkersList.length > 0) {
+                        setSelectedBiomarker(allBiomarkersList[0]);
+                    }
+                }
+            } catch (err) {
+                console.error('Erro ao carregar exames:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         loadExams();
     }, []);
-
-    const loadExams = async () => {
-        setIsLoading(true);
-        try {
-            const data = await getExamHistory();
-            setExams(data);
-
-            // Auto-select first biomarker if available
-            if (data.length > 0) {
-                const allBiomarkers = getAllBiomarkers(data);
-                if (allBiomarkers.length > 0) {
-                    setSelectedBiomarker(allBiomarkers[0]);
-                }
-            }
-        } catch (err) {
-            console.error('Erro ao carregar exames:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     // Extract unique biomarker names from all exams
     const getAllBiomarkers = (examData) => {

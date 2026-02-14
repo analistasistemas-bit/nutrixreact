@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { useGamification } from '../../hooks/useGamification';
 
 const StreakCounter = ({ compact = false }) => {
@@ -22,7 +22,7 @@ const StreakCounter = ({ compact = false }) => {
 
     if (compact) {
         return (
-            <div className="flex items-center space-x-1 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-full px-2.5 py-1">
+            <div className="flex items-center space-x-1 bg-orange-100/30 dark:bg-orange-900/40 backdrop-blur-md border border-orange-200/50 dark:border-orange-500/20 rounded-full px-2.5 py-1">
                 <span className="text-sm">{getStreakEmoji()}</span>
                 <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{currentStreak}d</span>
             </div>
@@ -31,9 +31,11 @@ const StreakCounter = ({ compact = false }) => {
 
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-zinc-50 dark:bg-bg-elevated rounded-2xl border border-zinc-200 dark:border-border-subtle p-4 shadow-sm"
+            className={`relative overflow-hidden rounded-3xl border shadow-sm
+                bg-white dark:bg-bg-elevated 
+                border-zinc-200 dark:border-border-subtle p-5 shadow-black/5`}
         >
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">

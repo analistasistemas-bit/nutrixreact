@@ -7,9 +7,25 @@ import insforge from '../lib/insforge';
 const AI_MODEL = 'openai/gpt-4o-mini';
 
 // ============================================================
-// 🔬 EXAMS - Analyze blood test PDFs
+// 🛡️ SECURITY HELPERS
 // ============================================================
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+
+function validateFile(file) {
+    if (!file) throw new Error('Nenhum arquivo fornecido.');
+
+    if (file.size > MAX_FILE_SIZE) {
+        throw new Error('Arquivo muito grande. O limite é 10MB.');
+    }
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+        throw new Error('Formato de arquivo não suportado. Use PDF ou Imagem.');
+    }
+    return true;
+}
 export async function analyzeExam(file) {
+    validateFile(file);
     // 1. Upload PDF to storage
     const { data: uploadData, error: uploadError } = await insforge.storage
         .from('uploads')
@@ -94,6 +110,7 @@ Retorne APENAS o JSON, sem markdown, sem texto adicional.`
 // 📏 MEASUREMENTS - Analyze body measurement PDFs
 // ============================================================
 export async function analyzeMeasurements(file) {
+    validateFile(file);
     const { data: uploadData, error: uploadError } = await insforge.storage
         .from('uploads')
         .uploadAuto(file);
@@ -172,6 +189,7 @@ Inclua apenas as medidas que conseguir extrair do documento. Retorne APENAS o JS
 // 📋 NUTRITION PLAN - Analyze and generate recipes
 // ============================================================
 export async function analyzeNutritionPlan(file) {
+    validateFile(file);
     const { data: uploadData, error: uploadError } = await insforge.storage
         .from('uploads')
         .uploadAuto(file);
@@ -255,6 +273,7 @@ Retorne APENAS o JSON.`
 // 📸 FOOD - Analyze food photo with AI Vision
 // ============================================================
 export async function analyzeFoodPhoto(file, mealType) {
+    validateFile(file);
     // Convert file to base64 for vision
     const base64 = await fileToBase64(file);
 

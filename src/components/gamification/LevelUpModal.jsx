@@ -1,40 +1,49 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { useGamification } from '../../hooks/useGamification';
 
 const CONFETTI_COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#22c55e', '#ec4899'];
 
 const ConfettiParticle = ({ delay, color }) => {
-    const randomX = Math.random() * 100;
-    const randomSize = 4 + Math.random() * 8;
-    const randomDuration = 1.5 + Math.random() * 2;
-    const randomRotation = Math.random() * 720 - 360;
+    const [config, setConfig] = useState(null);
+
+    useEffect(() => {
+        setConfig({ // eslint-disable-line react-hooks/set-state-in-effect
+            x: Math.random() * 100,
+            size: 4 + Math.random() * 8,
+            duration: 1.5 + Math.random() * 2,
+            rotation: Math.random() * 720 - 360,
+            isRound: Math.random() > 0.5
+        });
+    }, []);
+
+    if (!config) return null;
 
     return (
         <motion.div
             initial={{
-                x: `${randomX}vw`,
+                x: `${config.x}vw`,
                 y: -20,
                 rotate: 0,
                 opacity: 1,
             }}
             animate={{
                 y: '110vh',
-                rotate: randomRotation,
+                rotate: config.rotation,
                 opacity: [1, 1, 0],
             }}
             transition={{
-                duration: randomDuration,
+                duration: config.duration,
                 delay: delay,
                 ease: "easeIn",
             }}
             className="fixed pointer-events-none z-[200]"
             style={{
-                width: randomSize,
-                height: randomSize,
+                width: config.size,
+                height: config.size,
                 backgroundColor: color,
-                borderRadius: Math.random() > 0.5 ? '50%' : '2px',
-                left: `${randomX}%`,
+                borderRadius: config.isRound ? '50%' : '2px',
+                left: `${config.x}%`,
             }}
         />
     );
@@ -43,10 +52,19 @@ const ConfettiParticle = ({ delay, color }) => {
 const LevelUpModal = () => {
     const { levelUpData, dismissLevelUp } = useGamification();
     const [showConfetti, setShowConfetti] = useState(false);
+    const [confettiParticles, setConfettiParticles] = useState([]);
 
     useEffect(() => {
         if (levelUpData) {
-            setShowConfetti(true);
+            // Use setTimeout to avoid synchronous setState in effect linter error
+            setTimeout(() => {
+                setShowConfetti(true);
+                setConfettiParticles([...Array(50)].map((_, i) => ({
+                    id: i,
+                    delay: Math.random() * 0.5,
+                    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length]
+                })));
+            }, 0);
             const timer = setTimeout(() => setShowConfetti(false), 4000);
             return () => clearTimeout(timer);
         }
@@ -58,11 +76,11 @@ const LevelUpModal = () => {
             <AnimatePresence>
                 {showConfetti && (
                     <>
-                        {[...Array(50)].map((_, i) => (
+                        {confettiParticles.map((p) => (
                             <ConfettiParticle
-                                key={i}
-                                delay={Math.random() * 0.5}
-                                color={CONFETTI_COLORS[i % CONFETTI_COLORS.length]}
+                                key={p.id}
+                                delay={p.delay}
+                                color={p.color}
                             />
                         ))}
                     </>

@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Activity, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
+import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Activity, CheckCircle, AlertCircle } from 'lucide-react';
 import NutrixoIcon from '../assets/nutrixo-icon-v2.png';
+import { z } from 'zod';
+
+const loginSchema = z.object({
+    email: z.string().email('E-mail inválido.'),
+    password: z.string().min(6, 'A senha deve ter pelo menos 6 caracteres.'),
+});
 
 const Login = ({ onLogin }) => {
     const [email, setEmail] = useState('');
@@ -9,15 +15,60 @@ const Login = ({ onLogin }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({});
     const [isSuccess, setIsSuccess] = useState(false);
+    const [isDev] = useState(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-    const isValid = email.includes('@') && email.includes('.') && password.length >= 6;
+    React.useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const urlEmail = params.get('email');
+        const urlPass = params.get('pass');
+
+        if (urlEmail) setEmail(urlEmail);
+        if (urlPass) setPassword(urlPass);
+
+        // Auto-submit if both are present and valid
+        if (urlEmail && urlPass) {
+            const result = loginSchema.safeParse({ email: urlEmail, password: urlPass });
+            if (result.success) {
+                setTimeout(() => {
+                    document.getElementById('login-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                    handleSubmit({ preventDefault: () => { } });
+                }, 500);
+            }
+        }
+    }, []);
+
+    const handleQuickLogin = () => {
+        setEmail('test@test.com');
+        setPassword('123456');
+        setTimeout(() => {
+            handleSubmit({ preventDefault: () => { } });
+        }, 100);
+    };
+
+    const checkValidity = () => {
+        const result = loginSchema.safeParse({ email, password });
+        return result.success;
+    };
+
+    const isValid = checkValidity();
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!isValid) return;
-
         setError('');
+        setFieldErrors({});
+
+        const result = loginSchema.safeParse({ email, password });
+        if (!result.success) {
+            const errors = {};
+            result.error.issues.forEach(issue => {
+                errors[issue.path[0]] = issue.message;
+            });
+            setFieldErrors(errors);
+            return;
+        }
+
         setIsLoading(true);
 
         // Simulate API call
@@ -89,7 +140,7 @@ const Login = ({ onLogin }) => {
                     </div>
 
                     {/* Form */}
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form id="login-form" onSubmit={handleSubmit} className="space-y-6">
 
                         {/* Email Field */}
                         <div className="space-y-2">
@@ -101,7 +152,7 @@ const Login = ({ onLogin }) => {
                                     <Mail className="h-5 w-5 text-zinc-500 group-focus-within:text-cyan-400 transition-colors" />
                                 </div>
                                 <input
-                                    id="email"
+                                    id="login-email"
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -110,6 +161,12 @@ const Login = ({ onLogin }) => {
                                     required
                                 />
                             </div>
+                            {fieldErrors.email && (
+                                <p className="text-red-400 text-[10px] mt-1 ml-1 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {fieldErrors.email}
+                                </p>
+                            )}
                         </div>
 
                         {/* Password Field */}
@@ -127,7 +184,7 @@ const Login = ({ onLogin }) => {
                                     <Lock className="h-5 w-5 text-zinc-500 group-focus-within:text-cyan-400 transition-colors" />
                                 </div>
                                 <input
-                                    id="password"
+                                    id="login-password"
                                     type={showPassword ? "text" : "password"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -147,6 +204,12 @@ const Login = ({ onLogin }) => {
                                     )}
                                 </button>
                             </div>
+                            {fieldErrors.password && (
+                                <p className="text-red-400 text-[10px] mt-1 ml-1 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {fieldErrors.password}
+                                </p>
+                            )}
                         </div>
 
                         {/* Error Message */}
@@ -163,6 +226,7 @@ const Login = ({ onLogin }) => {
 
                         {/* Submit Button */}
                         <motion.button
+                            id="login-submit"
                             whileHover={{ scale: isValid && !isLoading ? 1.02 : 1 }}
                             whileTap={{ scale: isValid && !isLoading ? 0.98 : 1 }}
                             type="submit"
@@ -187,13 +251,23 @@ const Login = ({ onLogin }) => {
                         </motion.button>
 
                         {/* Sign Up Link */}
-                        <div className="text-center pt-2">
+                        <div className="text-center pt-2 space-y-4">
                             <p className="text-sm text-zinc-500">
                                 Ainda não tem uma conta?{' '}
                                 <a href="#" className="font-semibold text-cyan-400 hover:text-cyan-300 transition-colors">
                                     Criar conta
                                 </a>
                             </p>
+
+                            {isDev && (
+                                <button
+                                    type="button"
+                                    onClick={handleQuickLogin}
+                                    className="text-[10px] font-bold text-zinc-600 hover:text-zinc-400 uppercase tracking-widest transition-colors border border-zinc-800 rounded-full px-4 py-1.5 hover:bg-zinc-800"
+                                >
+                                    ⚡ Quick Login (Dev Only)
+                                </button>
+                            )}
                         </div>
 
                     </form>

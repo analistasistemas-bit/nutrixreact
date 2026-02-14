@@ -1,24 +1,37 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { useGamification } from '../../hooks/useGamification';
 
 const PetWidget = ({ showDetails = true }) => {
     const { petStage, petMood, level, currentStreak, actionsToday } = useGamification();
 
-    const speechBubbleMessages = [
+    const speechBubbleMessages = React.useMemo(() => [
         petMood.message,
         `Estou no nível ${level}!`,
         currentStreak > 0 ? `${currentStreak} dias juntos! 💕` : 'Vamos começar hoje?',
         actionsToday > 0 ? 'Bom trabalho hoje!' : 'Faça algo por sua saúde!',
-    ];
+    ], [petMood.message, level, currentStreak, actionsToday]);
 
-    const randomMessage = speechBubbleMessages[Math.floor(Math.random() * speechBubbleMessages.length)];
+    const [randomMessage, setRandomMessage] = React.useState('');
+    const [sparkles, setSparkles] = React.useState([]);
+
+    React.useEffect(() => {
+        setRandomMessage(speechBubbleMessages[Math.floor(Math.random() * speechBubbleMessages.length)]);
+        setSparkles([...Array(4)].map((_, i) => ({
+            id: i,
+            top: `${30 + Math.random() * 40}%`,
+            left: `${20 + Math.random() * 60}%`,
+            duration: 1.5 + Math.random(),
+        })));
+    }, [speechBubbleMessages]);
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`relative rounded-2xl border shadow-sm overflow-hidden ${petMood.bgColor.split(' ').filter(c => !c.startsWith('dark:')).join(' ')} dark:bg-bg-elevated border-gray-200/50 dark:border-border-subtle`}
+            className={`relative rounded-3xl border shadow-sm overflow-hidden 
+                bg-white dark:bg-bg-elevated 
+                border-zinc-200 dark:border-border-subtle shadow-black/5`}
         >
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-50 dark:opacity-10">
@@ -77,13 +90,13 @@ const PetWidget = ({ showDetails = true }) => {
                     {/* Sparkles around pet when mood is good */}
                     {(petMood.label === 'Épico!' || petMood.label === 'Empolgado') && (
                         <>
-                            {[...Array(4)].map((_, i) => (
+                            {sparkles.map((sparkle) => (
                                 <motion.span
-                                    key={i}
+                                    key={sparkle.id}
                                     className="absolute text-sm"
                                     style={{
-                                        top: `${30 + Math.random() * 40}%`,
-                                        left: `${20 + Math.random() * 60}%`,
+                                        top: sparkle.top,
+                                        left: sparkle.left,
                                     }}
                                     animate={{
                                         opacity: [0, 1, 0],
@@ -92,8 +105,8 @@ const PetWidget = ({ showDetails = true }) => {
                                     }}
                                     transition={{
                                         repeat: Infinity,
-                                        duration: 1.5 + Math.random(),
-                                        delay: i * 0.3,
+                                        duration: sparkle.duration,
+                                        delay: sparkle.id * 0.3,
                                     }}
                                 >
                                     ✨
