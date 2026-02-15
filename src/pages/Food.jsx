@@ -148,14 +148,14 @@ const Food = () => {
             transition={{ duration: 0.5 }}
             className="max-w-4xl mx-auto w-full"
         >
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+            <div className="bg-white dark:bg-bg-elevated rounded-2xl border border-gray-200 dark:border-border-subtle p-6 shadow-sm">
                 {/* Header */}
                 <div className="text-center mb-6">
                     <div className="w-14 h-14 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-sm">
                         <UtensilsCrossed className="w-7 h-7 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">🍽️ Registrar Alimentação</h2>
-                    <p className="text-gray-600 text-sm">Tire uma foto, use a voz ou descreva o que comeu</p>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">🍽️ Registrar Alimentação</h2>
+                    <p className="text-gray-600 dark:text-text-secondary text-sm">Tire uma foto, use a voz ou descreva o que comeu</p>
                 </div>
 
                 {/* Meal Type Selector */}
@@ -168,7 +168,7 @@ const Food = () => {
                             onClick={() => setSelectedMeal(meal)}
                             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedMeal.id === meal.id
                                 ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-sm'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                : 'bg-gray-100 dark:bg-bg-secondary text-gray-600 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-bg-hover'
                                 }`}
                         >
                             {meal.emoji} {meal.label}
@@ -206,13 +206,13 @@ const Food = () => {
                         </div>
 
                         {/* Manual Text Input */}
-                        <div className="border border-gray-200 rounded-xl p-4">
-                            <h3 className="font-bold text-gray-900 text-sm mb-2">✍️ Ou descreva manualmente:</h3>
+                        <div className="border border-gray-200 dark:border-border-subtle rounded-xl p-4">
+                            <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-2">✍️ Ou descreva manualmente:</h3>
                             <textarea
                                 value={manualText}
                                 onChange={(e) => setManualText(e.target.value)}
                                 placeholder="Ex: Arroz integral, frango grelhado, salada e feijão..."
-                                className="w-full p-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none resize-none"
+                                className="w-full p-3 border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none resize-none dark:text-white dark:placeholder-gray-500"
                                 rows={3}
                             />
                             <button
@@ -251,14 +251,14 @@ const Food = () => {
                         </div>
 
                         {voiceText && (
-                            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                                <p className="text-sm text-gray-600 mb-1">Texto reconhecido:</p>
-                                <p className="font-medium text-gray-900">"{voiceText}"</p>
+                            <div className="bg-gray-50 dark:bg-bg-secondary border border-gray-200 dark:border-border-subtle rounded-xl p-4">
+                                <p className="text-sm text-gray-600 dark:text-text-secondary mb-1">Texto reconhecido:</p>
+                                <p className="font-medium text-gray-900 dark:text-white">"{voiceText}"</p>
                                 <div className="flex space-x-2 mt-3">
                                     <button onClick={submitVoiceText} className="flex-1 py-2 bg-blue-500 text-white rounded-lg font-bold text-sm hover:bg-blue-400">
                                         Analisar com IA 🤖
                                     </button>
-                                    <button onClick={reset} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-100">
+                                    <button onClick={reset} className="px-4 py-2 border border-gray-200 dark:border-border-subtle rounded-lg text-sm text-gray-600 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-bg-hover">
                                         Cancelar
                                     </button>
                                 </div>
@@ -318,27 +318,27 @@ const Food = () => {
                             </div>
 
                             {/* Totals */}
-                            <div className="bg-gradient-to-br from-orange-50 to-red-50 border border-orange-200 rounded-xl p-5">
-                                <h3 className="font-bold text-orange-800 mb-3">{selectedMeal.emoji} {selectedMeal.label}</h3>
+                            <div className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/10 dark:to-red-900/10 border border-orange-200 dark:border-orange-900/30 rounded-xl p-5">
+                                <h3 className="font-bold text-orange-800 dark:text-orange-400 mb-3">{selectedMeal.emoji} {selectedMeal.label}</h3>
                                 {analysisResult.description && (
-                                    <p className="text-gray-600 text-sm mb-3">{analysisResult.description}</p>
+                                    <p className="text-gray-600 dark:text-text-secondary text-sm mb-3">{analysisResult.description}</p>
                                 )}
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                    <div className="bg-white rounded-xl p-3 text-center border border-gray-100">
-                                        <p className="text-xs text-gray-500">🔥 Calorias</p>
-                                        <p className="text-2xl font-bold text-gray-900">{analysisResult.totalCalories}</p>
+                                    <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
+                                        <p className="text-xs text-gray-500 dark:text-text-muted">🔥 Calorias</p>
+                                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{analysisResult.totalCalories}</p>
                                     </div>
-                                    <div className="bg-white rounded-xl p-3 text-center border border-gray-100">
-                                        <p className="text-xs text-gray-500">🥩 Proteínas</p>
-                                        <p className="text-2xl font-bold text-red-600">{analysisResult.totalProtein}g</p>
+                                    <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
+                                        <p className="text-xs text-gray-500 dark:text-text-muted">🥩 Proteínas</p>
+                                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">{analysisResult.totalProtein}g</p>
                                     </div>
-                                    <div className="bg-white rounded-xl p-3 text-center border border-gray-100">
-                                        <p className="text-xs text-gray-500">🍞 Carbos</p>
-                                        <p className="text-2xl font-bold text-amber-600">{analysisResult.totalCarbs}g</p>
+                                    <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
+                                        <p className="text-xs text-gray-500 dark:text-text-muted">🍞 Carbos</p>
+                                        <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysisResult.totalCarbs}g</p>
                                     </div>
-                                    <div className="bg-white rounded-xl p-3 text-center border border-gray-100">
-                                        <p className="text-xs text-gray-500">🥑 Gorduras</p>
-                                        <p className="text-2xl font-bold text-green-600">{analysisResult.totalFats}g</p>
+                                    <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
+                                        <p className="text-xs text-gray-500 dark:text-text-muted">🥑 Gorduras</p>
+                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{analysisResult.totalFats}g</p>
                                     </div>
                                 </div>
                             </div>
@@ -346,22 +346,22 @@ const Food = () => {
                             {/* Individual Foods */}
                             {analysisResult.foods?.length > 0 && (
                                 <div className="space-y-2">
-                                    <h3 className="font-bold text-sm text-gray-700">🍴 Alimentos Identificados</h3>
+                                    <h3 className="font-bold text-sm text-gray-700 dark:text-text-primary">🍴 Alimentos Identificados</h3>
                                     {analysisResult.foods.map((food, idx) => (
                                         <motion.div
                                             key={idx}
                                             initial={{ opacity: 0, x: -10 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             transition={{ delay: idx * 0.08 }}
-                                            className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl p-3"
+                                            className="flex items-center justify-between bg-gray-50 dark:bg-bg-secondary border border-gray-200 dark:border-border-subtle rounded-xl p-3"
                                         >
                                             <div>
-                                                <p className="font-medium text-gray-900 text-sm">{food.name}</p>
-                                                <p className="text-gray-500 text-xs">{food.portion}</p>
+                                                <p className="font-medium text-gray-900 dark:text-white text-sm">{food.name}</p>
+                                                <p className="text-gray-500 dark:text-text-muted text-xs">{food.portion}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="font-bold text-orange-600 text-sm">{food.calories} kcal</p>
-                                                <p className="text-gray-400 text-xs">P:{food.protein}g C:{food.carbs}g G:{food.fats}g</p>
+                                                <p className="font-bold text-orange-600 dark:text-orange-400 text-sm">{food.calories} kcal</p>
+                                                <p className="text-gray-400 dark:text-text-disabled text-xs">P:{food.protein}g C:{food.carbs}g G:{food.fats}g</p>
                                             </div>
                                         </motion.div>
                                     ))}

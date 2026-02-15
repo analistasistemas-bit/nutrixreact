@@ -11,7 +11,7 @@ const BottomNav = () => {
     return (
         <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
             <div
-                className="flex items-center p-2 overflow-x-auto scrollbar-hide"
+                className="flex items-center p-1 overflow-x-auto scrollbar-hide"
                 style={{
                     scrollbarWidth: 'none',
                     msOverflowStyle: 'none',
@@ -23,7 +23,9 @@ const BottomNav = () => {
                         key={tab.id}
                         onClick={() => navigate(tab.path)}
                         whileTap={{ scale: 0.9 }}
-                        className={`flex flex-col items-center p-2 rounded-lg flex-shrink-0 min-w-[64px] ${activeTab === tab.id ? 'text-cyan-600 bg-cyan-50' : 'text-gray-400'
+                        className={`flex flex-col items-center p-1 rounded-lg flex-shrink-0 min-w-[56px] ${activeTab === tab.id
+                            ? 'text-cyan-800 bg-cyan-100 dark:bg-cyan-900/40 dark:text-cyan-200 font-bold'
+                            : 'text-gray-400 dark:text-text-disabled'
                             }`}
                     >
                         <span className="text-xl mb-1">{tab.emoji}</span>

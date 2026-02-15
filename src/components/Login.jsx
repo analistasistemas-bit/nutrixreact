@@ -19,34 +19,6 @@ const Login = ({ onLogin }) => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [isDev] = useState(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-    React.useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const urlEmail = params.get('email');
-        const urlPass = params.get('pass');
-
-        if (urlEmail) setEmail(urlEmail);
-        if (urlPass) setPassword(urlPass);
-
-        // Auto-submit if both are present and valid
-        if (urlEmail && urlPass) {
-            const result = loginSchema.safeParse({ email: urlEmail, password: urlPass });
-            if (result.success) {
-                setTimeout(() => {
-                    document.getElementById('login-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-                    handleSubmit({ preventDefault: () => { } });
-                }, 500);
-            }
-        }
-    }, []);
-
-    const handleQuickLogin = () => {
-        setEmail('test@test.com');
-        setPassword('123456');
-        setTimeout(() => {
-            handleSubmit({ preventDefault: () => { } });
-        }, 100);
-    };
-
     const checkValidity = () => {
         const result = loginSchema.safeParse({ email, password });
         return result.success;
@@ -90,6 +62,34 @@ const Login = ({ onLogin }) => {
                 onLogin();
             }, 800); // Wait a bit to show success state
         }, 1500);
+    };
+
+    React.useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const urlEmail = params.get('email');
+        const urlPass = params.get('pass');
+
+        if (urlEmail) setEmail(urlEmail);
+        if (urlPass) setPassword(urlPass);
+
+        // Auto-submit if both are present and valid
+        if (urlEmail && urlPass) {
+            const result = loginSchema.safeParse({ email: urlEmail, password: urlPass });
+            if (result.success) {
+                setTimeout(() => {
+                    document.getElementById('login-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                    handleSubmit({ preventDefault: () => { } });
+                }, 500);
+            }
+        }
+    }, [handleSubmit]); // Added dependency
+
+    const handleQuickLogin = () => {
+        setEmail('test@test.com');
+        setPassword('123456');
+        setTimeout(() => {
+            handleSubmit({ preventDefault: () => { } });
+        }, 100);
     };
 
     return (

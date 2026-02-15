@@ -18,7 +18,10 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
     const [showMobileNotifications, setShowMobileNotifications] = useState(false);
     const { petStage, level } = useGamification();
 
-    const activeTab = tabs.find(t => t.path === location.pathname)?.id || 'dashboard';
+    const activeTab = tabs.find(t =>
+        location.pathname === t.path ||
+        (t.path !== '/' && location.pathname.startsWith(t.path))
+    )?.id || 'dashboard';
 
     const handleNotificationClick = (id, target) => {
         onMarkRead(id);
@@ -56,7 +59,7 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                         whileTap={{ scale: 0.98 }}
                                         transition={{ duration: 0.15 }}
                                         className={`relative flex items-center space-x-2 px-5 py-3 h-11 rounded-full font-bold text-sm tracking-tight border transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 select-none ${activeTab === tab.id
-                                            ? 'bg-gradient-to-r from-cyan-600 to-blue-600 border-transparent text-white shadow-md shadow-cyan-500/25 ring-1 ring-black/5'
+                                            ? 'bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-500 dark:to-blue-500 border-transparent text-white shadow-md shadow-cyan-500/25 dark:shadow-cyan-500/10 ring-1 ring-black/5 dark:ring-white/10'
                                             : 'bg-white/80 dark:bg-bg-elevated border-gray-200/60 dark:border-border-subtle text-slate-600 dark:text-text-secondary hover:bg-slate-50 dark:hover:bg-bg-hover hover:border-slate-300 dark:hover:border-border-strong hover:text-slate-900 dark:hover:text-text-primary hover:shadow-sm'
                                             }`}
                                     >
@@ -182,30 +185,45 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                                             </motion.div>
                                                         )}
                                                     </AnimatePresence>
-                                                    <button className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group">
-                                                        <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg group-hover:bg-white dark:group-hover:bg-zinc-700 group-hover:shadow-sm transition-all">
-                                                            <User className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                                                    <button className="w-full px-3 py-2.5 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group">
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-900/30">
+                                                                <User className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100">Meu Perfil</p>
+                                                                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Ver configurações da conta</p>
+                                                            </div>
                                                         </div>
-                                                        <span>Meu Perfil</span>
                                                     </button>
                                                     <button className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group">
-                                                        <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg group-hover:bg-white dark:group-hover:bg-zinc-700 group-hover:shadow-sm transition-all">
-                                                            <Settings className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-900/30">
+                                                                <Settings className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100">Configurações</p>
+                                                                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Gerenciar preferências</p>
+                                                            </div>
                                                         </div>
-                                                        <span>Configurações</span>
                                                     </button>
                                                     <button
                                                         onClick={toggleTheme}
                                                         className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group"
                                                     >
-                                                        <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg group-hover:bg-white dark:group-hover:bg-zinc-700 group-hover:shadow-sm transition-all">
-                                                            {theme === 'dark' ? (
-                                                                <Sun className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-yellow-500" />
-                                                            ) : (
-                                                                <Moon className="w-4 h-4 text-zinc-500 dark:text-zinc-400 group-hover:text-indigo-600" />
-                                                            )}
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="p-1.5 rounded-lg bg-yellow-50 dark:bg-yellow-900/30">
+                                                                {theme === 'dark' ? (
+                                                                    <Sun className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                                                                ) : (
+                                                                    <Moon className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                                                                )}
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100">Modo de Tema</p>
+                                                                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</p>
+                                                            </div>
                                                         </div>
-                                                        <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
                                                     </button>
                                                     <div className="h-px bg-gray-100 dark:bg-slate-800 my-1 mx-2"></div>
                                                     <button

@@ -13,7 +13,7 @@ const MainLayout = ({ user, onLogout }) => {
 
     return (
         <GamificationProvider>
-            <div className="min-h-screen bg-white text-gray-900 relative">
+            <div className="min-h-screen relative">
                 <Header
                     user={user}
                     onLogout={onLogout}
@@ -24,7 +24,7 @@ const MainLayout = ({ user, onLogout }) => {
                 />
 
                 {/* Main Content */}
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 lg:pb-8 pt-4">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32 lg:pb-8 pt-4">
                     <Outlet />
                 </div>
 

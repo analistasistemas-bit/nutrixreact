@@ -163,4 +163,12 @@ AIAnalysisPage.Disclaimer = () => (
     </motion.div>
 );
 
+// Export individual components for flexibility
+export const AIAnalysisHeader = AIAnalysisPage.Header;
+export const AIAnalysisUploadZone = AIAnalysisPage.UploadZone;
+export const AIAnalysisLoading = AIAnalysisPage.Loading;
+export const AIAnalysisError = AIAnalysisPage.Error;
+export const AIAnalysisResults = AIAnalysisPage.Results;
+export const AIAnalysisDisclaimer = AIAnalysisPage.Disclaimer;
+
 export default AIAnalysisPage;

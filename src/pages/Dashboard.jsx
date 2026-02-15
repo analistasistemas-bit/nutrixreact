@@ -10,12 +10,51 @@ import XPBar from '../components/gamification/XPBar';
 import StreakCounter from '../components/gamification/StreakCounter';
 import PetWidget from '../components/gamification/PetWidget';
 import DailyChallenges from '../components/gamification/DailyChallenges';
+import { getExamHistory } from '../services/aiService';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const [macroNutrients] = useState(initialMacroNutrients);
     const [dailyCalories] = useState(2000);
     const [consumedCalories] = useState(850);
+    const [healthMetrics, setHealthMetrics] = useState([]);
+    const [isLoadingHealth, setIsLoadingHealth] = useState(true);
+
+    React.useEffect(() => {
+        const fetchHealthData = async () => {
+            try {
+                const history = await getExamHistory();
+                if (history && history.length > 0) {
+                    // Pegar o exame mais recente
+                    const latestExam = history[0];
+                    const biomarkers = latestExam.analysis?.biomarkers || [];
+
+                    // Mapear biomarcadores para o formato do card (priorizando os 3 principais)
+                    const relevantNames = ['Vitamina D', 'Ferro', 'Colesterol Total', 'Glicose', 'Hemoglobina'];
+                    const mappedMetrics = biomarkers
+                        .filter(b => relevantNames.some(name => b.name.toLowerCase().includes(name.toLowerCase())))
+                        .slice(0, 3) // Mostrar apenas 3 principais
+                        .map(b => ({
+                            name: b.name,
+                            value: `${b.value} ${b.unit}`,
+                            status: b.status === 'low' ? 'Abaixo do normal' :
+                                b.status === 'high' ? 'Acima do normal' : 'Normal',
+                            emoji: b.name.toLowerCase().includes('vitamina') ? '💊' :
+                                b.name.toLowerCase().includes('ferro') ? '🩸' :
+                                    b.name.toLowerCase().includes('colesterol') ? '⚠️' : '🧪'
+                        }));
+
+                    setHealthMetrics(mappedMetrics);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar dados de saúde:", error);
+            } finally {
+                setIsLoadingHealth(false);
+            }
+        };
+
+        fetchHealthData();
+    }, []);
 
     return (
         <motion.div
@@ -43,29 +82,47 @@ const Dashboard = () => {
                         <TrendingUp className="w-5 h-5 text-cyan-600" />
                     </div>
                     <div className="space-y-3">
-                        {healthMetrics.map((metric, index) => (
-                            <motion.div
-                                key={index}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-zinc-200 dark:border-border-subtle hover:border-cyan-300 dark:hover:border-cyan-700 transition-all duration-300"
-                            >
-                                <div className="flex items-center space-x-3">
-                                    <span className="text-xl">{metric.emoji}</span>
-                                    <div>
-                                        <h3 className="font-bold text-base text-zinc-900 dark:text-text-primary">{metric.name}</h3>
-                                        <p className="text-zinc-500 dark:text-text-muted text-sm">{metric.value}</p>
+                        {isLoadingHealth ? (
+                            <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                                <div className="w-8 h-8 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
+                                <p className="text-zinc-500 dark:text-text-muted text-sm">Atualizando seus dados...</p>
+                            </div>
+                        ) : healthMetrics.length > 0 ? (
+                            healthMetrics.map((metric, index) => (
+                                <motion.div
+                                    key={index}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-zinc-200 dark:border-border-subtle hover:border-cyan-300 dark:hover:border-cyan-700 transition-all duration-300"
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <span className="text-xl">{metric.emoji}</span>
+                                        <div>
+                                            <h3 className="font-bold text-base text-zinc-900 dark:text-text-primary">{metric.name}</h3>
+                                            <p className="text-zinc-500 dark:text-text-muted text-sm">{metric.value}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className={`px-3 py-1 rounded-lg text-xs font-bold ${metric.status.includes('Abaixo') ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
-                                    metric.status.includes('Acima') ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
-                                        'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
-                                    }`}>
-                                    {metric.status}
-                                </div>
-                            </motion.div>
-                        ))}
+                                    <div className={`px-3 py-1 rounded-lg text-xs font-bold ${metric.status.includes('Abaixo') ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
+                                        metric.status.includes('Acima') ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
+                                            'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+                                        }`}>
+                                        {metric.status}
+                                    </div>
+                                </motion.div>
+                            ))
+                        ) : (
+                            <div className="text-center py-10 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-dashed border-zinc-200 dark:border-border-subtle">
+                                <HeartPulse className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+                                <p className="text-zinc-500 dark:text-text-muted text-sm mb-4">Nenhum exame importado ainda</p>
+                                <button
+                                    onClick={() => navigate('/labs')}
+                                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold rounded-lg transition-colors"
+                                >
+                                    Importar Primeiro Exame
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </motion.div>
 

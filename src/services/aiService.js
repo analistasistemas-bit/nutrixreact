@@ -33,12 +33,21 @@ export async function analyzeExam(file) {
 
     if (uploadError) throw new Error('Erro ao enviar arquivo: ' + uploadError.message);
 
+    const fileUrl = insforge.storage
+        .from('uploads')
+        .getPublicUrl(uploadData.key);
+
+    // Convert file to base64 for AI analysis (bypass storage URL issues)
+    const fileBase64 = await fileToBase64(file);
+
+    console.log('DEBUG: fileUrl (DB):', fileUrl);
+
     // 2. Create pending record in DB
     const { data: examRecord, error: dbError } = await insforge.database
         .from('nutrixo_exams')
         .insert([{
             file_name: file.name,
-            file_url: uploadData.url,
+            file_url: fileUrl,
             file_key: uploadData.key,
             status: 'analyzing',
         }])
@@ -78,7 +87,7 @@ Retorne APENAS o JSON, sem markdown, sem texto adicional.`
                         type: 'file',
                         file: {
                             filename: file.name,
-                            file_data: uploadData.url,
+                            file_data: fileBase64,
                         },
                     },
                 ],
@@ -117,11 +126,20 @@ export async function analyzeMeasurements(file) {
 
     if (uploadError) throw new Error('Erro ao enviar arquivo: ' + uploadError.message);
 
+    const fileUrl = insforge.storage
+        .from('uploads')
+        .getPublicUrl(uploadData.key);
+
+    // Convert file to base64 for AI analysis
+    const fileBase64 = await fileToBase64(file);
+
+
+
     const { data: record, error: dbError } = await insforge.database
         .from('nutrixo_measurements')
         .insert([{
             file_name: file.name,
-            file_url: uploadData.url,
+            file_url: fileUrl,
             file_key: uploadData.key,
             status: 'analyzing',
         }])
@@ -143,16 +161,22 @@ export async function analyzeMeasurements(file) {
     "waist": { "value": 80, "unit": "cm" },
     "hip": { "value": 95, "unit": "cm" },
     "chest": { "value": 100, "unit": "cm" },
-    "arm": { "value": 32, "unit": "cm" },
-    "thigh": { "value": 55, "unit": "cm" },
-    "bodyFat": { "value": 18, "unit": "%" }
+    "abdomen": { "value": 85, "unit": "cm" },
+    "armRight": { "value": 32, "unit": "cm" },
+    "armLeft": { "value": 31.5, "unit": "cm" },
+    "thighRight": { "value": 55, "unit": "cm" },
+    "thighLeft": { "value": 54.5, "unit": "cm" },
+    "bodyFat": { "value": 18, "unit": "%" },
+    "muscleMass": { "value": 60, "unit": "kg" },
+    "visceralFat": { "value": 5, "unit": "level" },
+    "basalMetabolicRate": { "value": 1800, "unit": "kcal" }
   },
   "bmi": { "value": 25.9, "classification": "Sobrepeso" },
   "waistHipRatio": { "value": 0.84, "classification": "Normal" },
-  "summary": "Resumo da análise corporal",
-  "recommendations": ["Recomendação 1", "Recomendação 2"]
+  "summary": "Resumo detalhado",
+  "recommendations": ["Sugestão 1"]
 }
-Inclua apenas as medidas que conseguir extrair do documento. Retorne APENAS o JSON.`
+IMPORTANTE: Extraia CADA UM dos indicadores numéricos de saúde e medidas presentes no PDF. NÃO SE LIMITE aos exemplos acima. Se encontrar uma medida nova (ex: "Panturrilha", "Subescapular"), crie uma chave em camelCase (ex: calf, subscapular) e extraia o valor e unidade. NÃO OMITA NADA. Priorize fidelidade total ao relatório. Retorne APENAS o JSON válido sem formatação markdown.`
             },
             {
                 role: 'user',
@@ -160,7 +184,7 @@ Inclua apenas as medidas que conseguir extrair do documento. Retorne APENAS o JS
                     { type: 'text', text: 'Analise estas medidas corporais e retorne os resultados em JSON:' },
                     {
                         type: 'file',
-                        file: { filename: file.name, file_data: uploadData.url },
+                        file: { filename: file.name, file_data: fileBase64 },
                     },
                 ],
             },
@@ -196,11 +220,18 @@ export async function analyzeNutritionPlan(file) {
 
     if (uploadError) throw new Error('Erro ao enviar arquivo: ' + uploadError.message);
 
+    const fileUrl = insforge.storage
+        .from('uploads')
+        .getPublicUrl(uploadData.key);
+
+    // Convert file to base64 for AI analysis
+    const fileBase64 = await fileToBase64(file);
+
     const { data: record, error: dbError } = await insforge.database
         .from('nutrixo_plans')
         .insert([{
             file_name: file.name,
-            file_url: uploadData.url,
+            file_url: fileUrl,
             file_key: uploadData.key,
             status: 'analyzing',
         }])
@@ -244,7 +275,7 @@ Retorne APENAS o JSON.`
                     { type: 'text', text: 'Analise este plano alimentar e extraia as refeições e macros:' },
                     {
                         type: 'file',
-                        file: { filename: file.name, file_data: uploadData.url },
+                        file: { filename: file.name, file_data: fileBase64 },
                     },
                 ],
             },
@@ -283,6 +314,10 @@ export async function analyzeFoodPhoto(file, mealType) {
         .uploadAuto(file);
 
     if (uploadError) throw new Error('Erro ao enviar foto: ' + uploadError.message);
+
+    const fileUrl = insforge.storage
+        .from('uploads')
+        .getPublicUrl(uploadData.key);
 
     const completion = await insforge.ai.chat.completions.create({
         model: AI_MODEL,
@@ -333,7 +368,7 @@ Retorne APENAS o JSON.`
             meal_type: mealType,
             input_method: 'photo',
             description: analysis.description || 'Refeição analisada por foto',
-            image_url: uploadData.url,
+            image_url: fileUrl,
             image_key: uploadData.key,
             analysis,
             calories: analysis.totalCalories || 0,
@@ -473,6 +508,17 @@ export async function getLatestMeasurements() {
 
     if (error && error.code !== 'PGRST116') throw error;
     return data;
+}
+
+export async function getMeasurementHistory() {
+    const { data, error } = await insforge.database
+        .from('nutrixo_measurements')
+        .select('*')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
 }
 
 // ============================================================
