@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { TrendingUp, ChevronDown, Upload, Camera, MessageCircle, FileText, Shield, Lock, Sparkles, HeartPulse, Info, AlertTriangle } from 'lucide-react';
-import { healthMetrics } from '../data/mockMetrics';
-import { recentInsights } from '../data/mockInsights';
-import { initialMacroNutrients } from '../data/mockMetrics';
+import { healthMetrics } from '../data/mocks/mockMetrics';
+import { recentInsights } from '../data/mocks/mockInsights';
+import { initialMacroNutrients } from '../data/mocks/mockMetrics';
 import MacroNutrientsCard from '../components/MacroNutrientsCard';
 import XPBar from '../components/gamification/XPBar';
 import StreakCounter from '../components/gamification/StreakCounter';

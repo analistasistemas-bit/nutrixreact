@@ -54,8 +54,8 @@ const InsightDrawer = ({ isOpen, onClose, insightData }) => {
                     >
                         <div className="flex items-center justify-between mb-8">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-emerald-500/10 rounded-xl">
-                                    <Target className="w-5 h-5 text-emerald-500" />
+                                <div className="p-2 bg-cyan-500/10 rounded-xl">
+                                    <Target className="w-5 h-5 text-cyan-500" />
                                 </div>
                                 <h3 className="text-xl font-bold dark:text-white">Detalhes do Plano</h3>
                             </div>
@@ -72,7 +72,7 @@ const InsightDrawer = ({ isOpen, onClose, insightData }) => {
 
                         <div className="space-y-6">
                             <div className="p-6 bg-zinc-50 dark:bg-bg-secondary rounded-3xl border border-zinc-100 dark:border-border-subtle">
-                                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-500 rounded-md text-[8px] font-black uppercase tracking-widest mb-2 inline-block">Ajuste Sugerido</span>
+                                <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-500 rounded-md text-[8px] font-black uppercase tracking-widest mb-2 inline-block">Ajuste Sugerido</span>
                                 <h4 className="text-lg font-bold dark:text-white mb-2">Ajuste Proteico Estratégico</h4>
                                 <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
                                     Baseado na sua redução de gordura, o plano foi otimizado para preservar massa magra.
@@ -90,12 +90,12 @@ const InsightDrawer = ({ isOpen, onClose, insightData }) => {
                                             <span className="text-2xl">{item.icon}</span>
                                             <span className="font-bold dark:text-white text-sm">{item.meal}</span>
                                         </div>
-                                        <span className="text-emerald-500 font-mono font-bold text-xs">{item.change}</span>
+                                        <span className="text-cyan-500 font-mono font-bold text-xs">{item.change}</span>
                                     </div>
                                 ))}
                             </div>
 
-                            <button className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-emerald-500/20">
+                            <button className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-2xl font-bold hover:shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-cyan-500/20">
                                 Abrir Plano Completo
                                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </button>
@@ -129,14 +129,14 @@ const CorrelationInsights = ({ insights }) => {
                         stiffness: 300
                     }}
                     className={`p-6 rounded-[2.5rem] border backdrop-blur-md shadow-lg flex flex-col justify-between group h-full cursor-default ${insight.theme === 'success'
-                        ? 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100/50 dark:border-emerald-500/10'
+                        ? 'bg-cyan-50/40 dark:bg-cyan-500/5 border-cyan-100/50 dark:border-cyan-500/10'
                         : 'bg-amber-50/40 dark:bg-amber-500/5 border-amber-100/50 dark:border-amber-500/10'
                         }`}
                 >
                     <div className="space-y-4">
                         <div className="flex items-center gap-3">
-                            <div className={`p-2.5 rounded-2xl ${insight.theme === 'success' ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}>
-                                <insight.icon className={`w-5 h-5 ${insight.theme === 'success' ? 'text-emerald-500' : 'text-amber-500'}`} />
+                            <div className={`p-2.5 rounded-2xl ${insight.theme === 'success' ? 'bg-cyan-500/10' : 'bg-amber-500/10'}`}>
+                                <insight.icon className={`w-5 h-5 ${insight.theme === 'success' ? 'text-cyan-500' : 'text-amber-500'}`} />
                             </div>
                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Insight Prioritário</span>
                         </div>
@@ -153,8 +153,8 @@ const CorrelationInsights = ({ insights }) => {
 
 // --- Sub-componente: AIScanCore (HUD Central) ---
 const AIScanCore = ({ status = 'normal' }) => {
-    const colorClass = status === 'normal' ? 'text-emerald-500' : 'text-amber-500';
-    const bgClass = status === 'normal' ? 'bg-emerald-500/20' : 'bg-amber-500/20';
+    const colorClass = status === 'normal' ? 'text-cyan-500' : 'text-amber-500';
+    const bgClass = status === 'normal' ? 'bg-cyan-500/20' : 'bg-amber-500/20';
 
     return (
         <div className="relative w-48 h-48 md:w-64 md:h-64 flex items-center justify-center">
@@ -181,7 +181,7 @@ const AIScanCore = ({ status = 'normal' }) => {
             />
 
             {/* Núcleo Visual */}
-            <div className={`relative z-10 p-6 rounded-full bg-bg-elevated border-2 shadow-[0_0_30px_rgba(16,185,129,0.1)] ${colorClass} border-current`}>
+            <div className={`relative z-10 p-6 rounded-full bg-bg-elevated border-2 shadow-[0_0_30px_rgba(6,182,212,0.1)] ${colorClass} border-current`}>
                 <div className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center">
                     <motion.div
                         animate={{ opacity: [1, 0.5, 1] }}
@@ -233,7 +233,7 @@ const AILogTerminal = () => {
                     exit={{ y: -20, opacity: 0 }}
                     className="flex items-center gap-2"
                 >
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse" />
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
                         {logs[currentLog]}
                     </span>
@@ -263,13 +263,13 @@ const SentinelCard = ({ label, value, unit, trend, status, color, icon: Icon, de
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay, duration: 0.5 }}
             onClick={onClick}
-            className="flex-shrink-0 w-[calc(25%-18px)] min-w-[220px] group relative p-5 bg-white dark:bg-bg-elevated border border-zinc-100 dark:border-border-subtle rounded-[2rem] hover:ring-2 hover:ring-emerald-500/20 transition-all cursor-pointer shadow-sm hover:shadow-xl snap-start"
+            className="flex-shrink-0 w-[calc(25%-18px)] min-w-[220px] group relative p-5 bg-white dark:bg-bg-elevated border border-zinc-100 dark:border-border-subtle rounded-[2rem] hover:ring-2 hover:ring-cyan-500/20 transition-all cursor-pointer shadow-sm hover:shadow-xl snap-start"
         >
             <div className="flex items-center justify-between mb-4">
                 <div className={`p-2.5 rounded-2xl bg-opacity-10 bg-current`} style={{ color }}>
                     <Icon className="w-5 h-5" />
                 </div>
-                <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${status === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20' :
+                <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${status === 'success' ? 'bg-cyan-50 text-cyan-600 border-cyan-100 dark:bg-cyan-500/10 dark:border-cyan-500/20' :
                     'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:border-amber-500/20'
                     }`}>
                     {trend}
@@ -288,7 +288,7 @@ const SentinelCard = ({ label, value, unit, trend, status, color, icon: Icon, de
                 <span className="text-[8px] font-medium text-zinc-400 uppercase tracking-widest">
                     {date ? `Atualizado ${formatDate(date)}` : 'Sincronizado'}
                 </span>
-                <ArrowUpRight className="w-4 h-4 text-zinc-300 group-hover:text-emerald-500 transition-colors" />
+                <ArrowUpRight className="w-4 h-4 text-zinc-300 group-hover:text-cyan-500 transition-colors" />
             </div>
         </motion.div>
     );
@@ -300,7 +300,7 @@ const ScannerLine = () => (
         initial={{ top: '0%' }}
         animate={{ top: '100%' }}
         transition={{ duration: 1.5, ease: "easeInOut" }}
-        className="fixed left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500 to-transparent z-[100] pointer-events-none opacity-50 shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+        className="fixed left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent z-[100] pointer-events-none opacity-50 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
     />
 );
 
@@ -385,7 +385,7 @@ const BiomarkerDetailOverlay = ({ isOpen, onClose, marker }) => {
                         <div className="flex items-center justify-between mb-12">
                             <div className="flex items-center gap-4">
                                 <div className="p-3 rounded-2xl bg-zinc-100 dark:bg-white/5">
-                                    <Activity className="w-6 h-6 text-emerald-500" />
+                                    <Activity className="w-6 h-6 text-cyan-500" />
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-bold dark:text-white">{translateLabel(marker.label)}</h2>
@@ -407,7 +407,7 @@ const BiomarkerDetailOverlay = ({ isOpen, onClose, marker }) => {
                                 </div>
                                 <div className="p-6 bg-zinc-50 dark:bg-white/5 rounded-3xl">
                                     <p className="text-[10px] font-black uppercase text-zinc-500 mb-2">Referência IA</p>
-                                    <div className="text-xl font-bold text-emerald-500 mt-2">
+                                    <div className="text-xl font-bold text-cyan-500 mt-2">
                                         Zona de Otimização
                                     </div>
                                 </div>
@@ -416,14 +416,14 @@ const BiomarkerDetailOverlay = ({ isOpen, onClose, marker }) => {
                             <div className="h-[300px] w-full bg-zinc-50 dark:bg-white/5 rounded-[2.5rem] p-6">
                                 <EnhancedAreaChart
                                     data={marker.history}
-                                    color="#10b981"
+                                    color="#06b6d4"
                                     label={marker.label}
                                 />
                             </div>
 
                             <div className="p-8 border border-zinc-100 dark:border-white/5 rounded-[2.5rem] space-y-4">
                                 <div className="flex items-center gap-2">
-                                    <BrainCircuit className="w-5 h-5 text-emerald-500" />
+                                    <BrainCircuit className="w-5 h-5 text-cyan-500" />
                                     <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Análise Sentinela</span>
                                 </div>
                                 <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
@@ -521,7 +521,6 @@ const translateLabel = (label) => {
         'waisthipratio': 'Rel. Cintura-Quadril',
         'visceralfatrating': 'Nível de Gordura Visceral',
         'bodyage': 'Idade Corporal',
-        'bmi': 'IMC',
         'vfl': 'Nível de Gordura Visceral',
     };
 
@@ -605,7 +604,7 @@ const parseReferenceRange = (refString) => {
 
 
 // --- Sub-componente: EnhancedAreaChart (Estética Opção B - Storytelling) ---
-const EnhancedAreaChart = ({ data, color = "#10b981", height = 120, targetRange = null, showBaseline = true }) => {
+const EnhancedAreaChart = ({ data, color = "#06b6d4", height = 120, targetRange = null, showBaseline = true }) => {
     if (!data || data.length === 0) return (
         <div className="h-[120px] flex items-center justify-center bg-zinc-50/50 dark:bg-zinc-900/30 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
             <p className="text-zinc-400 text-[10px] font-mono uppercase tracking-widest text-center px-4">Dados insuficientes</p>
@@ -865,7 +864,7 @@ const Progress = () => {
                 technical: 'Hemograma',
                 description: 'Capacidade de transporte de oxigênio.',
                 icon: FlaskConical,
-                color: '#10b981', // Emerald
+                color: '#06b6d4', // Emerald
                 target: [12, 16],
                 action: 'Nutrição Ferro'
             },
@@ -930,14 +929,14 @@ const Progress = () => {
                 }
 
                 const statusMap = {
-                    normal: { label: 'IDEAL', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400', icon: CheckCircle2, priority: 3 },
+                    normal: { label: 'IDEAL', color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400', icon: CheckCircle2, priority: 3 },
                     high: { label: 'ALTO', color: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400', icon: AlertCircle, priority: 1 },
                     low: { label: 'BAIXO', color: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400', icon: AlertCircle, priority: 1 },
                     unknown: { label: 'ANÁLISE', color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/20 dark:text-zinc-400', icon: Info, priority: 2 }
                 };
 
                 const statusConfig = statusMap[calculatedStatus] || statusMap.unknown;
-                const cardColor = (calculatedStatus === 'normal') ? '#10b981' : (calculatedStatus === 'high' || calculatedStatus === 'low') ? '#ef4444' : meta.color;
+                const cardColor = (calculatedStatus === 'normal') ? '#06b6d4' : (calculatedStatus === 'high' || calculatedStatus === 'low') ? '#ef4444' : meta.color;
 
                 const biomarkerData = {
                     label: name,
@@ -1015,7 +1014,7 @@ const Progress = () => {
                                             <p className="text-zinc-400 text-xs font-medium uppercase tracking-wider">{technical}</p>
                                         </div>
                                     </div>
-                                    <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-zinc-400 hover:text-emerald-500">
+                                    <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-zinc-400 hover:text-cyan-500">
                                         <ArrowUpRight className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -1078,14 +1077,14 @@ const Progress = () => {
             weight: { label: 'Peso', icon: Scale, color: '#8b5cf6', defaultStatus: 'ESTÁVEL' },
             bodyFat: { label: 'Gordura Corporal', icon: Activity, color: '#ec4899', defaultStatus: 'EVOLUINDO' },
             bodyFatPercentage: { label: 'Gordura Corporal', icon: Activity, color: '#ec4899', defaultStatus: 'EVOLUINDO' },
-            waist: { label: 'Cintura', icon: Target, color: '#10b981', defaultStatus: 'REDUZINDO' },
-            waistCircumference: { label: 'Cintura', icon: Target, color: '#10b981', defaultStatus: 'REDUZINDO' },
+            waist: { label: 'Cintura', icon: Target, color: '#06b6d4', defaultStatus: 'REDUZINDO' },
+            waistCircumference: { label: 'Cintura', icon: Target, color: '#06b6d4', defaultStatus: 'REDUZINDO' },
             hip: { label: 'Quadril', icon: Activity, color: '#3b82f6', defaultStatus: 'NORMAL' },
             height: { label: 'Altura', icon: Ruler, color: '#6366f1', defaultStatus: 'FIXO' },
             chest: { label: 'Tórax', icon: Activity, color: '#f59e0b', defaultStatus: 'NORMAL' },
-            abdomen: { label: 'Abdominal', icon: Target, color: '#10b981', defaultStatus: 'MONITORANDO' },
+            abdomen: { label: 'Abdominal', icon: Target, color: '#06b6d4', defaultStatus: 'MONITORANDO' },
             imc: { label: 'IMC', icon: Scale, color: '#ef4444', defaultStatus: 'MONITORANDO' },
-            muscleMass: { label: 'Massa Muscular', icon: Activity, color: '#10b981', defaultStatus: 'EVOLUINDO' },
+            muscleMass: { label: 'Massa Muscular', icon: Activity, color: '#06b6d4', defaultStatus: 'EVOLUINDO' },
             fatMass: { label: 'Massa Gorda', icon: Activity, color: '#ec4899', defaultStatus: 'REDUZINDO' },
             leanMass: { label: 'Massa Magra', icon: Activity, color: '#6366f1', defaultStatus: 'AUMENTANDO' },
             visceralFat: { label: 'Gordura Visceral', icon: AlertCircle, color: '#ef4444', defaultStatus: 'ATENÇÃO' },
@@ -1093,7 +1092,7 @@ const Progress = () => {
             totalBodyWater: { label: 'Água Corporal', icon: Activity, color: '#3b82f6', defaultStatus: 'NORMAL' },
             boneMass: { label: 'Massa Óssea', icon: Activity, color: '#6366f1', defaultStatus: 'FIXO' },
             metabolicAge: { label: 'Idade Metabólica', icon: Activity, color: '#f59e0b', defaultStatus: 'ESTÁVEL' },
-            gripStrength: { label: 'Força de Preensão', icon: Activity, color: '#10b981', defaultStatus: 'AUMENTANDO' },
+            gripStrength: { label: 'Força de Preensão', icon: Activity, color: '#06b6d4', defaultStatus: 'AUMENTANDO' },
             flexibility: { label: 'Flexibilidade', icon: Ruler, color: '#3b82f6', defaultStatus: 'MELHORANDO' }
         };
 
@@ -1205,7 +1204,7 @@ const Progress = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider ${status === 'EXCELENTE' || status === 'NORMAL' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' :
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider ${status === 'EXCELENTE' || status === 'NORMAL' ? 'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-400' :
                             status === 'ATENÇÃO' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' :
                                 'bg-zinc-100 text-zinc-600 dark:bg-zinc-500/10 dark:text-zinc-400'
                             }`}>
@@ -1369,7 +1368,7 @@ const Progress = () => {
     if (isLoading) {
         return (
             <div className="min-h-[400px] flex flex-col items-center justify-center">
-                <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
+                <Loader2 className="w-10 h-10 text-cyan-500 animate-spin mb-4" />
                 <p className="text-zinc-500 font-medium">Sincronizando sua evolução...</p>
             </div>
         );
@@ -1388,7 +1387,7 @@ const Progress = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold dark:text-white flex items-center gap-3">
-                        <Activity className="text-emerald-500" /> Hub de Progresso
+                        <Activity className="text-cyan-500" /> Hub de Progresso
                     </h1>
                     <p className="text-zinc-500 text-sm">Entenda como sua saúde evoluiu nos últimos {timeFilter === '30d' ? '30 dias' : timeFilter === '90d' ? '90 dias' : '365 dias'}.</p>
                 </div>
@@ -1396,13 +1395,13 @@ const Progress = () => {
                 <div className="flex flex-wrap items-center gap-4">
                     {activeTab !== 'overview' && (
                         <div className="relative group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-emerald-500 transition-colors" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-cyan-500 transition-colors" />
                             <input
                                 type="text"
                                 placeholder="Buscar indicador..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 pr-4 py-2 bg-zinc-100 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-full md:w-48 dark:text-white"
+                                className="pl-10 pr-4 py-2 bg-zinc-100 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all w-full md:w-48 dark:text-white"
                             />
                         </div>
                     )}
@@ -1417,7 +1416,7 @@ const Progress = () => {
                                     key={opt.id}
                                     onClick={() => setSortBy(opt.id)}
                                     className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === opt.id
-                                        ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
+                                        ? 'bg-white dark:bg-zinc-700 text-cyan-600 dark:text-cyan-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
                                         : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
                                         }`}
                                 >
@@ -1433,7 +1432,7 @@ const Progress = () => {
                                 key={period}
                                 onClick={() => setTimeFilter(period)}
                                 className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${timeFilter === period
-                                    ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
+                                    ? 'bg-white dark:bg-zinc-700 text-cyan-600 dark:text-cyan-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
                                     : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
                                     }`}
                             >
@@ -1455,14 +1454,14 @@ const Progress = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`group px-6 py-4 flex items-center gap-2 text-sm font-medium transition-all relative ${activeTab === tab.id
-                            ? 'text-emerald-600 dark:text-emerald-400'
+                            ? 'text-cyan-600 dark:text-cyan-400'
                             : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
                             }`}
                     >
-                        <tab.icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${activeTab === tab.id ? 'text-emerald-500' : ''}`} />
+                        <tab.icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${activeTab === tab.id ? 'text-cyan-500' : ''}`} />
                         {tab.label}
                         {activeTab === tab.id && (
-                            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500" />
+                            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
                         )}
                     </button>
                 ))}
@@ -1490,22 +1489,22 @@ const Progress = () => {
                                 animate={{ y: 0, opacity: 1 }}
                                 className="p-10 bg-zinc-900 border border-zinc-800 rounded-[3.5rem] shadow-2xl relative overflow-hidden group"
                             >
-                                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full -mr-64 -mt-64 blur-[120px]" />
+                                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-cyan-500/5 rounded-full -mr-64 -mt-64 blur-[120px]" />
 
                                 <div className="flex flex-col lg:flex-row items-center gap-12 relative z-10">
                                     <div className="flex-1 space-y-8">
                                         <div className="flex items-center gap-4">
-                                            <div className="p-3.5 bg-emerald-500/20 rounded-[1.5rem]">
-                                                <BrainCircuit className="w-6 h-6 text-emerald-400" />
+                                            <div className="p-3.5 bg-cyan-500/20 rounded-[1.5rem]">
+                                                <BrainCircuit className="w-6 h-6 text-cyan-400" />
                                             </div>
                                             <div>
-                                                <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500/80 mb-1">Briefing Executivo de Saúde</h2>
+                                                <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500/80 mb-1">Briefing Executivo de Saúde</h2>
                                                 <p className="text-zinc-500 text-[10px] font-mono">Consistência de dados: 100% | Último processamento: Hoje</p>
                                             </div>
                                         </div>
 
                                         <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight tracking-tight">
-                                            Sua meta de gordura corporal está <span className="text-emerald-400">75% concluída</span>.
+                                            Sua meta de gordura corporal está <span className="text-cyan-400">75% concluída</span>.
                                         </h1>
 
                                         <p className="text-lg text-zinc-400 leading-relaxed max-w-2xl">
@@ -1513,12 +1512,12 @@ const Progress = () => {
                                         </p>
 
                                         <div className="flex flex-wrap items-center gap-6 pt-4 border-t border-white/5">
-                                            <button className="px-8 py-3.5 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                                            <button className="px-8 py-3.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-2xl font-bold hover:shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20">
                                                 Visualizar Plano Otimizado
                                                 <ArrowRight className="w-4 h-4" />
                                             </button>
                                             <div className="flex items-center gap-3 text-zinc-500 text-xs font-medium">
-                                                <CheckCircle2 className="w-4 h-4 text-emerald-500/50" />
+                                                <CheckCircle2 className="w-4 h-4 text-cyan-500/50" />
                                                 Sincronizado com 12 biomarcadores
                                             </div>
                                         </div>
@@ -1575,11 +1574,11 @@ const Progress = () => {
                                                 const trendData = getMeasurementTrend(key);
                                                 const lastVal = trendData[trendData.length - 1];
                                                 const meta = {
-                                                    weight: { label: 'Peso', icon: Scale, color: '#10b981' },
+                                                    weight: { label: 'Peso', icon: Scale, color: '#06b6d4' },
                                                     bodyFat: { label: 'Gordura corporal', icon: Activity, color: '#8b5cf6' },
                                                     muscleMass: { label: 'Massa Magra', icon: Zap, color: '#3b82f6' },
                                                     imc: { label: 'IMC', icon: Target, color: '#6366f1' },
-                                                    waist: { label: 'Cintura', icon: Ruler, color: '#10b981' },
+                                                    waist: { label: 'Cintura', icon: Ruler, color: '#06b6d4' },
                                                     height: { label: 'Altura', icon: Ruler, color: '#3b82f6' },
                                                     neck: { label: 'Pescoço', icon: Ruler, color: '#8b5cf6' },
                                                     chest: { label: 'Peito', icon: Ruler, color: '#6366f1' },
@@ -1720,7 +1719,7 @@ const Progress = () => {
                             {/* IA Footer: Insights Prioritários (v3) */}
                             <div className="space-y-8 pt-8">
                                 <div className="flex items-center gap-4">
-                                    <BrainCircuit className="w-5 h-5 text-emerald-500" />
+                                    <BrainCircuit className="w-5 h-5 text-cyan-500" />
                                     <h3 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Insights Estratégicos da Sentinela</h3>
                                     <div className="h-px flex-1 bg-zinc-100 dark:bg-white/5" />
                                 </div>
@@ -1776,7 +1775,7 @@ const Progress = () => {
                             Importe seu primeiro exame ou avaliação física para começar a rastrear sua evolução automaticamente.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <button className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20">
+                            <button className="px-8 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:shadow-lg hover:shadow-cyan-500/25 text-white rounded-2xl font-bold transition-all shadow-lg shadow-cyan-500/20">
                                 Importar Exame
                             </button>
                             <button className="px-8 py-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 dark:text-white rounded-2xl font-bold transition-all">

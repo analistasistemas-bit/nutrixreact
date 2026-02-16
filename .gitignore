@@ -1,4 +1,6 @@
 node_modules
-skills_sickn33/
-skills_vercel/
-skills_vudovn/
+.env
+.env.local
+.env.*.local
+dist
+skills_*/

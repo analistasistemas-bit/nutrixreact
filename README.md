@@ -1,16 +1,59 @@
-# React + Vite
+# 🧪 NutixoApp: Sua Jornada de Saúde Inteligente
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Versão](https://img.shields.io/badge/vers%C3%A3o-1.1.0-blue?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-orange?style=for-the-badge)
+![Framework](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)
+![Build](https://img.shields.io/badge/Vite-7-646CFF?style=for-the-badge&logo=vite)
 
-Currently, two official plugins are available:
+O **NutixoApp** é uma plataforma de saúde de próxima geração que combina inteligência artificial com gamificação para transformar o acompanhamento de exames e hábitos alimentares em uma experiência envolvente.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## ✨ Funcionalidades Principais
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 🔬 **Importação via IA**: Basta subir seu PDF de exames e nossa IA extrai todos os biomarcadores automaticamente.
+- 🎮 **Gamificação Sentinel**: Ganhe XP, suba de nível e cuide do seu Pet virtual mantendo hábitos saudáveis.
+- 📊 **Dashboard de Progresso**: Visualize sua evolução histórica com cards interativos e gráficos dinâmicos.
+- 🍎 **Plano Nutricional**: Integração direta entre seus dados de saúde e sugestões de alimentação.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🚀 Guia Rápido
+
+### Pré-requisitos
+- Node.js (v18 ou superior)
+- npm ou yarn
+
+### Instalação
+```bash
+# Clone o repositório
+git clone https://github.com/analistasistemas-bit/nutrixreact.git
+
+# Instale as dependências
+npm install
+
+# Inicie o servidor de desenvolvimento
+npm run dev
+```
+
+---
+
+## 🏗️ Exploração Técnica
+
+Para entender mais sobre o projeto, consulte nossa documentação interna:
+
+- 🏗️ **[Arquitetura do Projeto](./docs/ARCHITECTURE.md)**: Stack e estrutura de pastas.
+- 🎨 **[Design System](./docs/DESIGN_SYSTEM.md)**: Cores, fontes e componentes premium.
+- 🌿 **[Como Contribuir](./docs/CONTRIBUTING.md)**: Padrões de código e commits.
+- 🛡️ **[Segurança](./docs/SECURITY.md)**: Política de reporte de vulnerabilidades.
+
+---
+
+## 🛠️ Tecnologias Utilizadas
+- **Frontend**: React 19, Framer Motion.
+- **Estilo**: Tailwind CSS 4.
+- **Ícones**: Lucide React.
+- **Backend/IA**: Integração via @insforge/sdk.
+
+---
+*NutixoApp - Elevando sua saúde através da inteligência.*

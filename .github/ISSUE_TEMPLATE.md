@@ -1,0 +1,31 @@
+# Issue Template - NutixoApp
+
+## 🐜 Bug Report
+**Description**: A clear and concise description of what the bug is.
+
+**To Reproduce**:
+Steps to reproduce the behavior:
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
+
+**Expected behavior**: A clear and concise description of what you expected to happen.
+
+**Screenshots**: If applicable, add screenshots to help explain your problem.
+
+**Environment**:
+- Browser: [e.g. Chrome, Safari]
+- Version: [e.g. 22]
+
+---
+
+## 🚀 Feature Request
+**Is your feature request related to a problem? Please describe.**
+A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+
+**Describe the solution you'd like**
+A clear and concise description of what you want to happen.
+
+**Describe alternatives you've considered**
+A clear and concise description of any alternative solutions or features you've considered.

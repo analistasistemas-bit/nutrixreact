@@ -12,3 +12,5 @@ git commit -m "Atualizacao projeto Nutrixo"
 
 
 git push
+
+git status
