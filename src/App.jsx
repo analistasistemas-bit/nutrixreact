@@ -9,28 +9,55 @@ import Progress from './pages/Progress';
 import NutritionPlan from './pages/NutritionPlan';
 import Food from './pages/Food';
 import GamerProfile from './pages/GamerProfile';
+import ReloadPrompt from './components/ReloadPrompt';
+import insforge from './lib/insforge';
 
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  const user = {
+  // Restaurar sessão ao carregar
+  React.useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await insforge.auth.getCurrentSession();
+      if (data?.session) {
+        setCurrentUser(data.session.user);
+        setIsLoggedIn(true);
+      }
+    };
+    checkSession();
+  }, []);
+
+  const handleLogin = (userData) => {
+    setCurrentUser(userData);
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = async () => {
+    await insforge.auth.signOut();
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+  };
+
+  const displayUser = currentUser || {
     name: 'Diego',
     email: 'diego@nutrixo.com',
     avatar: null
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-  };
-
   if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />;
+    return (
+      <>
+        <Login onLogin={handleLogin} />
+        <ReloadPrompt />
+      </>
+    );
   }
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<MainLayout user={user} onLogout={handleLogout} />}>
+        <Route element={<MainLayout user={displayUser} onLogout={handleLogout} />}>
           <Route index element={<Dashboard />} />
           <Route path="labs" element={<Labs />} />
           <Route path="measurements" element={<Measurements />} />
@@ -40,6 +67,7 @@ const App = () => {
           <Route path="gamer-profile" element={<GamerProfile />} />
         </Route>
       </Routes>
+      <ReloadPrompt />
     </BrowserRouter>
   );
 };

@@ -10,8 +10,9 @@ import {
     XP_REWARDS,
 } from '../data/gamificationData';
 import { GamificationContext } from './GamificationContextInstance';
+import { useGamificationSync } from '../hooks/useGamificationSync';
 
-export const GamificationProvider = ({ children }) => {
+export const GamificationProvider = ({ children, user }) => {
     // Core state
     const [totalXP, setTotalXP] = useState(75); // Start with a bit of XP so user sees progress
     const [currentStreak] = useState(2);
@@ -37,6 +38,9 @@ export const GamificationProvider = ({ children }) => {
     const petStage = getPetStage(level);
     const petMood = getPetMood(currentStreak, actionsToday);
     const levelTitle = getLevelTitle(level);
+
+    // Sync layer - Re-ordered to avoid TDZ
+    const { persistXP } = useGamificationSync(totalXP, level, setTotalXP, user?.email || 'demo@nutrixo.com');
 
     // Show toast notification
     const showToast = useCallback((toast) => {
@@ -96,6 +100,9 @@ export const GamificationProvider = ({ children }) => {
             description: reward.label,
             emoji: '⚡',
         });
+
+        // Persist to Insforge
+        persistXP(newTotalXP, newLevel);
 
         // Check level up
         if (newLevel > oldLevel) {

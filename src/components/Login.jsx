@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Activity, CheckCircle, AlertCircle } from 'lucide-react';
 import NutrixoIcon from '../assets/nutrixo-icon-v2.png';
 import { z } from 'zod';
+import insforge from '../lib/insforge';
 
 const loginSchema = z.object({
     email: z.string().email('E-mail inválido.'),
@@ -10,6 +11,8 @@ const loginSchema = z.object({
 });
 
 const Login = ({ onLogin }) => {
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -43,25 +46,59 @@ const Login = ({ onLogin }) => {
 
         setIsLoading(true);
 
-        // Simulate API call
-        setTimeout(() => {
-            // Mock validation logic
-            // For demo purposes, we'll accept any valid email/password combo
-            // but let's pretend strictly for a specific one if we wanted, 
-            // but better to just let the user in for the UX demo.
-
-            // Let's add a fake error condition just to show the capability if needed
-            if (email === 'error@example.com') {
-                setError('E-mail ou senha incorretos.');
-                setIsLoading(false);
-                return;
-            }
-
+        const handleLoginSuccess = (userData) => {
             setIsSuccess(true);
             setTimeout(() => {
-                onLogin();
-            }, 800); // Wait a bit to show success state
-        }, 1500);
+                onLogin(userData); // Pass user data back
+            }, 800);
+        };
+
+        const attemptAuth = async () => {
+            try {
+                if (isSignUp) {
+                    const { data, error: signUpError } = await insforge.auth.signUp({
+                        email,
+                        password,
+                        name: name || 'Sentinel',
+                    });
+
+                    if (signUpError) {
+                        setError(signUpError.message || 'Erro ao criar conta.');
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    if (data) {
+                        handleLoginSuccess(data.user);
+                    }
+                } else {
+                    const { data, error: signInError } = await insforge.auth.signInWithPassword({
+                        email,
+                        password,
+                    });
+
+                    if (signInError) {
+                        if (signInError.error === 'INVALID_CREDENTIALS' && isDev) {
+                            console.warn('Fallback DEV: Credenciais inválidas no Insforge');
+                            handleLoginSuccess({ email, name: 'Diego (Dev)' });
+                            return;
+                        }
+                        setError(signInError.message || 'E-mail ou senha incorretos.');
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    if (data) {
+                        handleLoginSuccess(data.user);
+                    }
+                }
+            } catch (err) {
+                setError('Falha na conexão com o servidor.');
+                setIsLoading(false);
+            }
+        };
+
+        attemptAuth();
     };
 
     React.useEffect(() => {
@@ -127,7 +164,7 @@ const Login = ({ onLogin }) => {
                             transition={{ delay: 0.3 }}
                             className="text-2xl font-bold text-white mb-2"
                         >
-                            Bem-vindo de volta
+                            {isSignUp ? 'Criar Conta Sentinel' : 'Bem-vindo de volta'}
                         </motion.h1>
                         <motion.p
                             initial={{ y: 10, opacity: 0 }}
@@ -135,12 +172,39 @@ const Login = ({ onLogin }) => {
                             transition={{ delay: 0.4 }}
                             className="text-zinc-400 text-sm"
                         >
-                            Acompanhe sua saúde de forma inteligente
+                            {isSignUp ? 'Junte-se à elite da saúde e bem-estar' : 'Acompanhe sua saúde de forma inteligente'}
                         </motion.p>
                     </div>
 
                     {/* Form */}
-                    <form id="login-form" onSubmit={handleSubmit} className="space-y-6">
+                    <form id="login-form" onSubmit={handleSubmit} className="space-y-5">
+
+                        {/* Name Field (Sign Up Only) */}
+                        {isSignUp && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                className="space-y-2"
+                            >
+                                <label className="text-sm font-semibold text-zinc-300 ml-1" htmlFor="name">
+                                    Nome Completo
+                                </label>
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                        <Activity className="h-5 w-5 text-zinc-500 group-focus-within:text-cyan-400 transition-colors" />
+                                    </div>
+                                    <input
+                                        id="login-name"
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="block w-full pl-11 pr-4 py-3 bg-black/40 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all duration-200 outline-none sm:text-sm"
+                                        placeholder="Como devemos te chamar?"
+                                        required={isSignUp}
+                                    />
+                                </div>
+                            </motion.div>
+                        )}
 
                         {/* Email Field */}
                         <div className="space-y-2">
@@ -244,19 +308,26 @@ const Login = ({ onLogin }) => {
                                 )
                             ) : (
                                 <span className="flex items-center space-x-2">
-                                    <span>Entrar</span>
+                                    <span>{isSignUp ? 'Criar Conta' : 'Entrar'}</span>
                                     <ArrowRight className="w-5 h-5" />
                                 </span>
                             )}
                         </motion.button>
 
-                        {/* Sign Up Link */}
+                        {/* Toggle Link */}
                         <div className="text-center pt-2 space-y-4">
                             <p className="text-sm text-zinc-500">
-                                Ainda não tem uma conta?{' '}
-                                <a href="#" className="font-semibold text-cyan-400 hover:text-cyan-300 transition-colors">
-                                    Criar conta
-                                </a>
+                                {isSignUp ? 'Já tem uma conta?' : 'Ainda não tem uma conta?'} {' '}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsSignUp(!isSignUp);
+                                        setError('');
+                                    }}
+                                    className="font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+                                >
+                                    {isSignUp ? 'Fazer login' : 'Criar conta'}
+                                </button>
                             </p>
 
                             {isDev && (
