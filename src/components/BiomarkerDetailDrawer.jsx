@@ -117,7 +117,6 @@ const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
                                             <tr>
                                                 <th className="px-4 py-3">Data</th>
                                                 <th className="px-4 py-3">Valor</th>
-                                                <th className="px-4 py-3 text-right">Status</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-zinc-100 dark:divide-border-subtle bg-white dark:bg-bg-elevated">
@@ -134,11 +133,6 @@ const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
                                                                 point.value
                                                             } <span className="text-[10px] text-zinc-400 font-normal">{point.unit}</span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${pointStatusColor}`}>
-                                                                {pointStatusLabel}
-                                                            </span>
-                                                        </td>
                                                     </tr>
                                                 );
                                             })}
@@ -146,7 +140,7 @@ const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
                                         {biomarker.trend.length === 0 && (
                                             <tbody>
                                                 <tr>
-                                                    <td colSpan="3" className="px-4 py-8 text-center text-zinc-400">Nenhum histórico disponível.</td>
+                                                    <td colSpan="2" className="px-4 py-8 text-center text-zinc-400">Nenhum histórico disponível.</td>
                                                 </tr>
                                             </tbody>
                                         )}

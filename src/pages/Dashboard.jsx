@@ -19,6 +19,7 @@ const Dashboard = () => {
     const [consumedCalories] = useState(850);
     const [healthMetrics, setHealthMetrics] = useState([]);
     const [isLoadingHealth, setIsLoadingHealth] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
 
     React.useEffect(() => {
         const fetchHealthData = async () => {
@@ -29,11 +30,7 @@ const Dashboard = () => {
                     const latestExam = history[0];
                     const biomarkers = latestExam.analysis?.biomarkers || [];
 
-                    // Mapear biomarcadores para o formato do card (priorizando os 3 principais)
-                    const relevantNames = ['Vitamina D', 'Ferro', 'Colesterol Total', 'Glicose', 'Hemoglobina'];
                     const mappedMetrics = biomarkers
-                        .filter(b => relevantNames.some(name => b.name.toLowerCase().includes(name.toLowerCase())))
-                        .slice(0, 3) // Mostrar apenas 3 principais
                         .map(b => ({
                             name: b.name,
                             value: `${b.value} ${b.unit}`,
@@ -41,7 +38,8 @@ const Dashboard = () => {
                                 b.status === 'high' ? 'Acima do normal' : 'Normal',
                             emoji: b.name.toLowerCase().includes('vitamina') ? '💊' :
                                 b.name.toLowerCase().includes('ferro') ? '🩸' :
-                                    b.name.toLowerCase().includes('colesterol') ? '⚠️' : '🧪'
+                                    b.name.toLowerCase().includes('colesterol') ? '⚠️' : '🧪',
+                            isAlert: b.status === 'low' || b.status === 'high'
                         }));
 
                     setHealthMetrics(mappedMetrics);
@@ -75,42 +73,59 @@ const Dashboard = () => {
                     transition={{ duration: 0.5 }}
                     className="bg-white dark:bg-bg-elevated rounded-2xl border border-zinc-200 dark:border-border-subtle p-5 shadow-sm"
                 >
-                    <div className="flex items-center justify-between mb-5">
-                        <h2 className="text-xl font-bold text-zinc-900 dark:text-text-primary">
-                            🧬 Visão Geral de Saúde
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                        <h2 className="text-xl font-bold text-zinc-900 dark:text-text-primary whitespace-nowrap">
+                            🧬 Saúde ({healthMetrics.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase())).length})
                         </h2>
-                        <TrendingUp className="w-5 h-5 text-cyan-600" />
+                        <div className="relative flex-1 max-w-md">
+                            <input
+                                type="text"
+                                placeholder="Buscar exame..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 bg-zinc-50 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
+                            />
+                            <TrendingUp className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        </div>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-3 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
                         {isLoadingHealth ? (
                             <div className="flex flex-col items-center justify-center py-12 space-y-3">
                                 <div className="w-8 h-8 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
                                 <p className="text-zinc-500 dark:text-text-muted text-sm">Atualizando seus dados...</p>
                             </div>
                         ) : healthMetrics.length > 0 ? (
-                            healthMetrics.map((metric, index) => (
-                                <motion.div
-                                    key={index}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.1 }}
-                                    className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-zinc-200 dark:border-border-subtle hover:border-cyan-300 dark:hover:border-cyan-700 transition-all duration-300"
-                                >
-                                    <div className="flex items-center space-x-3">
-                                        <span className="text-xl">{metric.emoji}</span>
-                                        <div>
-                                            <h3 className="font-bold text-base text-zinc-900 dark:text-text-primary">{metric.name}</h3>
-                                            <p className="text-zinc-500 dark:text-text-muted text-sm">{metric.value}</p>
+                            healthMetrics
+                                .filter(metric => metric.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                .sort((a, b) => {
+                                    // Prioridade 1: Alertas (fora do normal)
+                                    if (a.isAlert && !b.isAlert) return -1;
+                                    if (!a.isAlert && b.isAlert) return 1;
+                                    // Prioridade 2: Ordem Alfabética
+                                    return a.name.localeCompare(b.name);
+                                })
+                                .map((metric, index) => (
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.05 }}
+                                        className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-zinc-200 dark:border-border-subtle hover:border-cyan-300 dark:hover:border-cyan-700 transition-all duration-300"
+                                    >
+                                        <div className="flex items-center space-x-3">
+                                            <span className="text-xl">{metric.emoji}</span>
+                                            <div>
+                                                <h3 className="font-bold text-base text-zinc-900 dark:text-text-primary">{metric.name}</h3>
+                                                <p className="text-zinc-500 dark:text-text-muted text-sm">{metric.value}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-lg text-xs font-bold ${metric.status.includes('Abaixo') ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
-                                        metric.status.includes('Acima') ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
+                                        <div className={`px-3 py-1 rounded-lg text-xs font-bold ${metric.isAlert ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
                                             'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
-                                        }`}>
-                                        {metric.status}
-                                    </div>
-                                </motion.div>
-                            ))
+                                            }`}>
+                                            {metric.status}
+                                        </div>
+                                    </motion.div>
+                                ))
                         ) : (
                             <div className="text-center py-10 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-dashed border-zinc-200 dark:border-border-subtle">
                                 <HeartPulse className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />

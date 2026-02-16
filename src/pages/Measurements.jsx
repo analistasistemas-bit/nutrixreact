@@ -70,28 +70,137 @@ const Measurements = () => {
 
     // Sub-componente para exibir os detalhes da análise (reutilizado no histórico)
     const MeasurementDetailView = ({ analysis }) => {
-        const measurements = analysis?.measurements || {};
+        // Se a IA não retornar a chave 'measurements', tentamos usar o próprio objeto 'analysis' (fallback para objetos planos)
+        // Mas ignoramos chaves padrão como 'summary', 'recommendations', 'bmi'
+        const baseData = analysis?.measurements || analysis || {};
+
+        // Helper recursivo para buscar valor em estruturas aninhadas ou strings com unidade
+        const findValue = (obj, targetKey) => {
+            if (!obj || typeof obj !== 'object') return undefined;
+
+            let item = obj[targetKey];
+
+            // Se o item for uma string (ex: "94.2 kg"), tentamos extrair o número e a unidade
+            if (typeof item === 'string') {
+                const match = item.match(/([\d.,]+)\s*(.*)/);
+                if (match) {
+                    return {
+                        value: parseFloat(match[1].replace(',', '.')),
+                        unit: match[2].trim() || ''
+                    };
+                }
+            }
+
+            if (item !== undefined && item !== null) {
+                if (typeof item === 'object' && item.value !== undefined) return item;
+                if (typeof item === 'number') return { value: item, unit: '' };
+            }
+
+            // Busca recursiva se não achou no nível atual
+            for (const k in obj) {
+                if (typeof obj[k] === 'object' && obj[k] !== null && k !== 'bmi') {
+                    const found = findValue(obj[k], targetKey);
+                    if (found) return found;
+                }
+            }
+            return undefined;
+        };
+
+        const getFriendlyLabel = (k) => {
+            const metadata = {
+                weight: '⚖️ Peso',
+                height: '📏 Altura',
+                waist: '🔵 Cintura',
+                hip: '🟢 Quadril',
+                chest: '🟡 Tórax',
+                bodyFat: '🔥 % Gordura',
+                bodyFatPercentage: '🔥 % Gordura',
+                abdomen: '🔴 Abdominal',
+                muscleMass: '💪 Massa Muscular',
+                visceralFat: '⚠️ Gordura Visceral',
+                basalMetabolicRate: '⚡ Taxa Metabólica Basal',
+                basalMetabolism: '⚡ Taxa Metabólica Basal',
+                fatMass: '🥩 Massa Gorda',
+                leanMass: '💎 Massa Magra',
+                leanBodyMass: '💎 Massa Magra',
+                totalBodyWater: '💧 Água corporal',
+                metabolicAge: '🕰️ Idade Metabólica',
+                gripStrength: '✊ Força de Preensão',
+                flexibility: '🧘 Flexibilidade',
+                vo2Max: '🫁 VO2 Máximo',
+                bloodPressure: '🩺 Pressão Arterial',
+                restingHeartRate: '❤️ FC Repouso',
+                waistCircumference: '🔵 Cintura'
+            };
+            if (metadata[k]) return metadata[k];
+
+            let label = k.replace(/([A-Z])/g, ' $1')
+                .replace(/^./, str => str.toUpperCase())
+                .replace('Arm', 'Braço')
+                .replace('Thigh', 'Coxa')
+                .replace('Calf', 'Panturrilha')
+                .replace('Forearm', 'Antebraço')
+                .replace('Leg', 'Perna')
+                .replace('Right', 'Direito')
+                .replace('Left', 'Esquerdo')
+                .replace('Mass', 'Massa')
+                .replace('Fat', 'Gordura')
+                .replace('Torax', 'Tórax')
+                .trim();
+
+            if (label.includes('Coxa') || label.includes('Panturrilha')) {
+                label = label.replace('Direito', 'Direita').replace('Esquerdo', 'Esquerda');
+            }
+
+            // Correções específicas para ordem natural em PT-BR
+            label = label.replace('Gordura Massa', 'Massa Gorda')
+                .replace('Lean Massa', 'Massa Magra')
+                .replace('Muscle Massa', 'Massa Muscular');
+
+            return label;
+        };
+
+        // Coletar todas as chaves únicas (filtrando as que não são medidas)
+        const allKeys = Object.keys(baseData).filter(k =>
+            !['summary', 'recommendations', 'bmi', 'goal', 'previousInjuries', 'trainingDuration', 'trainingFrequency', 'sportsHistory', 'performanceIndicators'].includes(k)
+        );
+
+        // Helper para extrair valor numérico do IMC caso venha como string
+        const parseBMI = (val) => {
+            if (typeof val === 'number') return val;
+            if (typeof val === 'string') {
+                const match = val.match(/([\d.,]+)/);
+                return match ? parseFloat(match[1].replace(',', '.')) : null;
+            }
+            if (val && typeof val === 'object' && val.value) return val.value;
+            return null;
+        };
+
+        const bmiValue = parseBMI(analysis?.bmi);
 
         return (
             <AIAnalysisResults show={true}>
                 {/* IMC Card */}
-                {analysis?.bmi && (
+                {bmiValue && (
                     <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10 border border-blue-200 dark:border-border-subtle rounded-xl p-5 shadow-sm mb-6">
                         <div className="flex items-center justify-between">
                             <div>
                                 <div className="flex items-center space-x-2 mb-1">
                                     <Scale className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                                    <h3 className="font-bold text-blue-800 dark:text-blue-400">IMC</h3>
+                                    <h3 className="font-bold text-blue-800 dark:text-blue-400 text-sm uppercase">IMC</h3>
                                 </div>
-                                <p className={`text-3xl font-bold ${getBMIColor(analysis.bmi.value)}`}>
-                                    {analysis.bmi.value}
+                                <p className={`text-4xl font-black ${getBMIColor(bmiValue)}`}>
+                                    {bmiValue}
                                 </p>
                             </div>
                             <div className="text-right">
-                                <p className="text-sm font-medium text-gray-700 dark:text-text-primary">{analysis.bmi.classification}</p>
+                                <p className="text-sm font-bold text-gray-700 dark:text-text-primary uppercase tracking-wider">
+                                    {analysis?.bmi?.classification || (bmiValue < 25 ? 'Normal' : bmiValue < 30 ? 'Sobrepeso' : 'Obesidade')}
+                                </p>
                                 {analysis.waistHipRatio && (
-                                    <p className="text-xs text-gray-500 dark:text-text-muted mt-1">
-                                        Cintura/Quadril: {analysis.waistHipRatio.value} ({analysis.waistHipRatio.classification})
+                                    <p className="text-[10px] text-gray-500 dark:text-text-muted mt-1 font-medium">
+                                        Cintura/Quadril: {typeof analysis.waistHipRatio === 'string' ? analysis.waistHipRatio : analysis.waistHipRatio.value}
+                                        {analysis.waistHipRatio.classification ? ` (${analysis.waistHipRatio.classification})` : ''}
                                     </p>
                                 )}
                             </div>
@@ -100,60 +209,36 @@ const Measurements = () => {
                 )}
 
                 {/* Measurements Grid */}
-                <h3 className="font-bold text-lg text-blue-700 dark:text-blue-400 mb-3">📐 Medidas Extraídas</h3>
+                <div className="flex items-center gap-2 mb-4">
+                    <Ruler className="w-4 h-4 text-blue-500" />
+                    <h3 className="font-black text-xs uppercase tracking-widest text-blue-700 dark:text-blue-400">Medidas Extraídas</h3>
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                    {(() => {
-                        const getFriendlyLabel = (k) => {
-                            const metadata = {
-                                weight: '⚖️ Peso', height: '📏 Altura', waist: '🔵 Cintura',
-                                hip: '🟢 Quadril', chest: '🟡 Tórax', bodyFat: '🔥 % Gordura',
-                                abdomen: '🔴 Abdominal', muscleMass: '💪 Massa Muscular',
-                                visceralFat: '⚠️ Gordura Visceral'
-                            };
-                            if (metadata[k]) return metadata[k];
-
-                            let label = k.replace(/([A-Z])/g, ' $1')
-                                .replace(/^./, str => str.toUpperCase())
-                                .replace('Arm', 'Braço')
-                                .replace('Thigh', 'Coxa')
-                                .replace('Calf', 'Panturrilha')
-                                .replace('Forearm', 'Antebraço')
-                                .replace('Right', 'Direito')
-                                .replace('Left', 'Esquerdo')
-                                .replace('Mass', 'Massa')
-                                .replace('Fat', 'Gordura')
-                                .replace('BasalMetabolicRate', 'Taxa Metabólica Basal')
-                                .trim();
-
-                            if (label.includes('Coxa')) {
-                                label = label.replace('Direito', 'Direita').replace('Esquerdo', 'Esquerda');
-                            }
-                            return label;
-                        };
-
-                        return Object.entries(measurements)
-                            .filter(([_, data]) => data && data.value)
-                            .sort(([keyA], [keyB]) => {
-                                const labelA = getFriendlyLabel(keyA).replace(/[^\w\s]/gi, '').trim();
-                                const labelB = getFriendlyLabel(keyB).replace(/[^\w\s]/gi, '').trim();
-                                return labelA.localeCompare(labelB);
-                            })
-                            .map(([key, data], idx) => (
-                                <motion.div
-                                    key={key}
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: idx * 0.08 }}
-                                    className="bg-gray-50 dark:bg-bg-secondary border border-gray-200 dark:border-border-subtle rounded-xl p-3 text-center"
-                                >
-                                    <p className="text-[10px] font-bold text-gray-500 dark:text-text-muted mb-1 uppercase tracking-tighter">
-                                        {getFriendlyLabel(key)}
-                                    </p>
-                                    <p className="text-xl font-bold text-gray-900 dark:text-text-primary">{data.value}</p>
-                                    <p className="text-xs text-gray-400 dark:text-text-muted">{data.unit}</p>
-                                </motion.div>
-                            ));
-                    })()}
+                    {allKeys
+                        .map(key => ({ key, data: findValue(baseData, key) }))
+                        .filter(({ data }) => data && data.value !== null && data.value !== undefined)
+                        .sort((a, b) => getFriendlyLabel(a.key).localeCompare(getFriendlyLabel(b.key)))
+                        .map(({ key, data }, idx) => (
+                            <motion.div
+                                key={key}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: idx * 0.05 }}
+                                className="bg-white dark:bg-bg-elevated border border-gray-100 dark:border-border-subtle rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow text-center"
+                            >
+                                <p className="text-[9px] font-black text-gray-400 dark:text-text-muted mb-2 uppercase tracking-widest">
+                                    {getFriendlyLabel(key)}
+                                </p>
+                                <p className="text-2xl font-black text-gray-900 dark:text-text-primary">
+                                    {typeof data.value === 'number' ? data.value.toLocaleString('pt-BR') : data.value}
+                                </p>
+                                <p className="text-[10px] font-bold text-blue-500/70 dark:text-blue-400/50 mt-1 uppercase">
+                                    {data.unit}
+                                </p>
+                            </motion.div>
+                        ))
+                    }
                 </div>
 
                 {/* Summary */}

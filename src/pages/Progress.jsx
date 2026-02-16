@@ -10,7 +10,6 @@ import {
     Activity,
     Scale,
     FlaskConical,
-    ChevronRight,
     ArrowUpRight,
     Calendar,
     Target,
@@ -18,8 +17,15 @@ import {
     CheckCircle2,
     AlertCircle,
     ArrowRight,
-    History,
-    Ruler
+    Ruler,
+    Search,
+    Sparkles,
+    Zap,
+    BrainCircuit,
+    Dna,
+    X,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import { getExamHistory, getMeasurementHistory } from '../services/aiService';
 import BiomarkerDetailDrawer from '../components/BiomarkerDetailDrawer';
@@ -101,6 +107,339 @@ const InsightDrawer = ({ isOpen, onClose, insightData }) => {
     );
 };
 
+// --- Sub-componente: CorrelationInsights (Motor de Inteligência) ---
+const CorrelationInsights = ({ insights }) => {
+    if (!insights || insights.length === 0) return null;
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {insights.map((insight, idx) => (
+                <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{
+                        y: -5,
+                        scale: 1.02,
+                        boxShadow: "0 20px 40px rgba(0,0,0,0.12)"
+                    }}
+                    transition={{
+                        delay: idx * 0.1,
+                        type: "spring",
+                        stiffness: 300
+                    }}
+                    className={`p-6 rounded-[2.5rem] border backdrop-blur-md shadow-lg flex flex-col justify-between group h-full cursor-default ${insight.theme === 'success'
+                        ? 'bg-emerald-50/40 dark:bg-emerald-500/5 border-emerald-100/50 dark:border-emerald-500/10'
+                        : 'bg-amber-50/40 dark:bg-amber-500/5 border-amber-100/50 dark:border-amber-500/10'
+                        }`}
+                >
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2.5 rounded-2xl ${insight.theme === 'success' ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}>
+                                <insight.icon className={`w-5 h-5 ${insight.theme === 'success' ? 'text-emerald-500' : 'text-amber-500'}`} />
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Insight Prioritário</span>
+                        </div>
+                        <div>
+                            <h4 className="font-bold dark:text-white text-lg mb-2">{insight.title}</h4>
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">{insight.description}</p>
+                        </div>
+                    </div>
+                </motion.div>
+            ))}
+        </div>
+    );
+};
+
+// --- Sub-componente: AIScanCore (HUD Central) ---
+const AIScanCore = ({ status = 'normal' }) => {
+    const colorClass = status === 'normal' ? 'text-emerald-500' : 'text-amber-500';
+    const bgClass = status === 'normal' ? 'bg-emerald-500/20' : 'bg-amber-500/20';
+
+    return (
+        <div className="relative w-48 h-48 md:w-64 md:h-64 flex items-center justify-center">
+            {/* Anéis Externos */}
+            <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 border-2 border-dashed border-zinc-700/30 rounded-full"
+            />
+            <motion.div
+                animate={{ rotate: -360 }}
+                transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-4 border border-zinc-500/20 rounded-full"
+            />
+
+            {/* Pulso Central */}
+            <motion.div
+                animate={{
+                    scale: [1, 1.1, 1],
+                    opacity: [0.3, 0.6, 0.3]
+                }}
+                transition={{ duration: 3, repeat: Infinity }}
+                className={`absolute inset-12 rounded-full blur-2xl ${bgClass}`}
+            />
+
+            {/* Núcleo Visual */}
+            <div className={`relative z-10 p-6 rounded-full bg-bg-elevated border-2 shadow-[0_0_30px_rgba(16,185,129,0.1)] ${colorClass} border-current`}>
+                <div className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center">
+                    <motion.div
+                        animate={{ opacity: [1, 0.5, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                        <Zap className="w-10 h-10 md:w-12 md:h-12" />
+                    </motion.div>
+                </div>
+                {/* Linha de Scan Circular */}
+                <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-[-10px] border-t-2 border-current rounded-full"
+                />
+            </div>
+        </div>
+    );
+};
+
+// --- Sub-componente: AILogTerminal (Pensamentos da IA) ---
+const AILogTerminal = () => {
+    const logs = [
+        "Sincronizando últimos exames laboratoriais...",
+        "Calculando correlação entre peso e massa muscular...",
+        "Analisando flexibilidade metabólica (Glicose / Insulina)...",
+        "Monitorando níveis de Vitamina D e Imunidade...",
+        "Rastreando eficiência do Plano Alimentar...",
+        "Otimizando recomendações de micronutrientes...",
+        "Monitoramento Ativo: STATUS SAUDÁVEL",
+        "AI Nutrixo: Sistema em prontidão."
+    ];
+
+    const [currentLog, setCurrentLog] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentLog((prev) => (prev + 1) % logs.length);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="h-6 flex items-center justify-center overflow-hidden">
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={currentLog}
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -20, opacity: 0 }}
+                    className="flex items-center gap-2"
+                >
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+                        {logs[currentLog]}
+                    </span>
+                </motion.div>
+            </AnimatePresence>
+        </div>
+    );
+};
+
+// --- Sub-componente: SentinelCard (Card KPI Premium) ---
+const SentinelCard = ({ label, value, unit, trend, status, color, icon: Icon, delay = 0, date, onClick }) => {
+    // Formata a data para DD/MM/YYYY
+    const formatDate = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr; // Fallback se já for formatada ou inválida
+            return d.toLocaleDateString('pt-BR');
+        } catch (e) {
+            return dateStr;
+        }
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay, duration: 0.5 }}
+            onClick={onClick}
+            className="flex-shrink-0 w-[calc(25%-18px)] min-w-[220px] group relative p-5 bg-white dark:bg-bg-elevated border border-zinc-100 dark:border-border-subtle rounded-[2rem] hover:ring-2 hover:ring-emerald-500/20 transition-all cursor-pointer shadow-sm hover:shadow-xl snap-start"
+        >
+            <div className="flex items-center justify-between mb-4">
+                <div className={`p-2.5 rounded-2xl bg-opacity-10 bg-current`} style={{ color }}>
+                    <Icon className="w-5 h-5" />
+                </div>
+                <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${status === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20' :
+                    'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:border-amber-500/20'
+                    }`}>
+                    {trend}
+                </div>
+            </div>
+
+            <div>
+                <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] mb-1">{label}</p>
+                <h3 className="text-2xl font-bold dark:text-white tabular-nums tracking-tight">
+                    {formatDisplayValue(value)}
+                    <span className="text-xs font-normal text-zinc-400 ml-1">{unit}</span>
+                </h3>
+            </div>
+
+            <div className="mt-5 pt-5 border-t border-zinc-50 dark:border-white/5 flex items-center justify-between">
+                <span className="text-[8px] font-medium text-zinc-400 uppercase tracking-widest">
+                    {date ? `Atualizado ${formatDate(date)}` : 'Sincronizado'}
+                </span>
+                <ArrowUpRight className="w-4 h-4 text-zinc-300 group-hover:text-emerald-500 transition-colors" />
+            </div>
+        </motion.div>
+    );
+};
+
+// --- Sub-componente: ScannerLine (Efeito de Revelação) ---
+const ScannerLine = () => (
+    <motion.div
+        initial={{ top: '0%' }}
+        animate={{ top: '100%' }}
+        transition={{ duration: 1.5, ease: "easeInOut" }}
+        className="fixed left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500 to-transparent z-[100] pointer-events-none opacity-50 shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+    />
+);
+
+
+// --- Helper: Análise Dinâmica Sentinela ---
+const getSentinelAnalysis = (marker) => {
+    if (!marker || !marker.history || marker.history.length < 2) {
+        return "A IA Nutrixo iniciou o monitoramento deste marcador. Continue registrando seus exames para desbloquear insights detalhados de tendência.";
+    }
+
+    const current = parseFloat(marker.value);
+    const previous = parseFloat(marker.history[marker.history.length - 2].value);
+    const diff = current - previous;
+    const absDiff = Math.abs(diff);
+    const percentChange = ((diff / previous) * 100).toFixed(1);
+
+    // Identificar contexto do marcador
+    const lowerIsBetter = ['weight', 'bodyFat', 'visceralFat', 'imc', 'cholesterol', 'triglycerides', 'glucose', 'intrep'].some(key =>
+        marker.label?.toLowerCase().includes(key) || marker.technical?.toLowerCase().includes(key)
+    );
+
+    const higherIsBetter = ['muscleMass', 'leanMass', 'water', 'testosterone', 'vitamin'].some(key =>
+        marker.label?.toLowerCase().includes(key) || marker.technical?.toLowerCase().includes(key)
+    );
+
+    // Lógica de Tendência
+    let trendText = "";
+    if (Math.abs(percentChange) < 1.5) {
+        trendText = "Estabilidade detectada. A manutenção destes níveis indica consistência metabólica.";
+    } else if (diff > 0) {
+        // Subiu
+        if (lowerIsBetter) {
+            trendText = `Alerta de Elevação. Houve um aumento de ${absDiff.toFixed(1)}${marker.unit} (${percentChange}%) desde o último registro. Recomendamos revisão de hábitos recentes.`;
+        } else if (higherIsBetter) {
+            trendText = `Progresso Confirmado! O aumento de ${absDiff.toFixed(1)}${marker.unit} (${percentChange}%) reflete uma adaptação positiva do seu organismo.`;
+        } else {
+            trendText = `Observamos uma elevação de ${percentChange}%. A IA continuará monitorando para estabelecer se é uma flutuação pontual ou tendência.`;
+        }
+    } else {
+        // Desceu
+        if (lowerIsBetter) {
+            trendText = `Excelente! Redução de ${absDiff.toFixed(1)}${marker.unit} (${Math.abs(percentChange)}%) detectada. Você está na direção certa.`;
+        } else if (higherIsBetter) {
+            trendText = `Atenção à Queda. Houve uma redução de ${absDiff.toFixed(1)}${marker.unit}. Verifique nutrição e recuperação para reverter este quadro.`;
+        } else {
+            trendText = `Registramos uma redução de ${Math.abs(percentChange)}%. Monitoramento contínuo ativo.`;
+        }
+    }
+
+    // Contexto de Status (se houver targets/status definidos)
+    let statusText = "";
+    if (marker.status === 'danger' || marker.calculatedStatus === 'high' || marker.calculatedStatus === 'low') {
+        statusText = " Atualmente, este marcador encontra-se fora da zona ideal de referência.";
+    } else if (marker.status === 'success' || marker.calculatedStatus === 'normal') {
+        statusText = " Seus níveis atuais estão dentro da zona de otimização esperada.";
+    }
+
+    return `${trendText}${statusText}`;
+};
+
+// --- Sub-componente: BiomarkerDetailOverlay (Modal de Histórico) ---
+const BiomarkerDetailOverlay = ({ isOpen, onClose, marker }) => {
+    if (!marker) return null;
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <>
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={onClose}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+                    />
+                    <motion.div
+                        initial={{ x: '100%' }}
+                        animate={{ x: 0 }}
+                        exit={{ x: '100%' }}
+                        className="fixed right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-bg-primary z-[101] shadow-2xl p-8 overflow-y-auto"
+                    >
+                        <div className="flex items-center justify-between mb-12">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 rounded-2xl bg-zinc-100 dark:bg-white/5">
+                                    <Activity className="w-6 h-6 text-emerald-500" />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold dark:text-white">{translateLabel(marker.label)}</h2>
+                                    <p className="text-sm text-zinc-500 uppercase tracking-widest font-black">Histórico de Performance</p>
+                                </div>
+                            </div>
+                            <button onClick={onClose} className="p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-colors">
+                                <X className="w-6 h-6 text-zinc-400" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-12">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="p-6 bg-zinc-50 dark:bg-white/5 rounded-3xl">
+                                    <p className="text-[10px] font-black uppercase text-zinc-500 mb-2">Valor Atual</p>
+                                    <div className="text-4xl font-black dark:text-white">
+                                        {formatDisplayValue(marker.value)} <span className="text-lg font-normal text-zinc-400">{marker.unit}</span>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-zinc-50 dark:bg-white/5 rounded-3xl">
+                                    <p className="text-[10px] font-black uppercase text-zinc-500 mb-2">Referência IA</p>
+                                    <div className="text-xl font-bold text-emerald-500 mt-2">
+                                        Zona de Otimização
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="h-[300px] w-full bg-zinc-50 dark:bg-white/5 rounded-[2.5rem] p-6">
+                                <EnhancedAreaChart
+                                    data={marker.history}
+                                    color="#10b981"
+                                    label={marker.label}
+                                />
+                            </div>
+
+                            <div className="p-8 border border-zinc-100 dark:border-white/5 rounded-[2.5rem] space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <BrainCircuit className="w-5 h-5 text-emerald-500" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Análise Sentinela</span>
+                                </div>
+                                <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                    {getSentinelAnalysis(marker)}
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
+                </>
+            )
+            }
+        </AnimatePresence >
+    );
+};
+
+
 // Helper para parsear valores numéricos de referência (PT-BR)
 const parseNumberVal = (str) => {
     if (!str) return null;
@@ -132,10 +471,96 @@ const parseNumberVal = (str) => {
     return parseFloat(clean.replace(/\./g, '')); // Fallback: remove pontos
 };
 
+// Helper para traduzir labels vindos da IA (Inglês -> Português)
+const translateLabel = (label) => {
+    if (!label) return '';
+    const dict = {
+        'weight': 'Peso',
+        'bodyfat': 'Gordura Corporal',
+        'musclemass': 'Massa Magra',
+        'leanbodymass': 'Massa Magra',
+        'imc': 'IMC',
+        'bmi': 'IMC',
+        'waist': 'Cintura',
+        'height': 'Altura',
+        'neck': 'Pescoço',
+        'chest': 'Peito',
+        'belly': 'Abdômen',
+        'abdomen': 'Abdômen',
+        'hips': 'Quadril',
+        'gripstrength': 'Força de Preensão',
+        'metabolicage': 'Idade Metabólica',
+        'bloodpressure': 'Pressão Arterial',
+        'visceralfat': 'Gordura Visceral',
+        'bodywater': 'Água Corporal',
+        'water': 'Água',
+        'bonemass': 'Massa Óssea',
+        'basalmetabolicrate': 'Taxa Metabólica Basal',
+        'bmr': 'Taxa Metabólica Basal',
+        'fatpercentage': 'Gordura %',
+        'skeletalmuscle': 'Músculo Esquelético',
+        'subcutaneousfat': 'Gordura Subcutânea',
+        'circumferenceabdomen': 'Circunferência Abdominal',
+        'estimatedmaxheartrate': 'Freq. Cardíaca Máx. Est.',
+        'fatmass': 'Massa Gorda',
+        'fatfreemass': 'Massa Livre de Gordura',
+        'protein': 'Proteína',
+        'minerals': 'Minerais',
+        'physique': 'Físico',
+        'healthscore': 'Score de Saúde',
+        'totalbodywater': 'Água Corporal Total',
+        'dryleanmass': 'Massa Magra Seca',
+        'bodyfatmass': 'Massa de Gordura Corporal',
+        'smm': 'Músculo Esquelético',
+        'pbf': 'Percentual de Gordura',
+        'whr': 'Relação Cintura-Quadril',
+        'obesitydegree': 'Grau de Obesidade',
+        'restingheartrate': 'FC Repouso',
+        'heartrate': 'Batimento Cardíaco',
+        'vo2max': 'VO2 Máx',
+        'waisthipratio': 'Rel. Cintura-Quadril',
+        'visceralfatrating': 'Nível de Gordura Visceral',
+        'bodyage': 'Idade Corporal',
+        'bmi': 'IMC',
+        'vfl': 'Nível de Gordura Visceral',
+    };
+
+    // Normalização agressiva: minúsculas e remove tudo que não for letra/número
+    const normalizedKey = label.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (dict[normalizedKey]) return dict[normalizedKey];
+
+    console.warn(`[Sentinel Translator] Missing translation for key: "${label}" (normalized: "${normalizedKey}")`);
+
+    // Fallback melhorado: 
+    // 1. Se for tudo maiúsculo (ex: FAT MASS), converte para Title Case
+    if (label === label.toUpperCase()) {
+        return label.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    // 2. Se for camelCase, separa e capitaliza
+    return label
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, str => str.toUpperCase())
+        .trim();
+};
+
+const translateStatus = (status) => {
+    if (!status) return 'Detectado';
+    const s = status.toLowerCase();
+    if (s === 'high') return 'Alto';
+    if (s === 'low') return 'Baixo';
+    if (s === 'normal') return 'Normal';
+    if (s === 'detected') return 'Detectado';
+    return status;
+};
+
 // Start of formatDisplayValue
 const formatDisplayValue = (val) => {
-    if (val === null || val === undefined || isNaN(val)) return '--';
-    return val.toLocaleString('pt-BR');
+    if (val === null || val === undefined || val === '') return '--';
+    const num = typeof val === 'string' ? parseNumberVal(val) : val;
+    if (num === null || isNaN(num)) return val; // Retorna original se não for número
+    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(num);
 };
 
 const parseReferenceRange = (refString) => {
@@ -176,9 +601,7 @@ const parseReferenceRange = (refString) => {
     return [Math.min(min, max), Math.max(min, max)];
 };
 
-// ... (EnhancedAreaChart stays same)
 
-// ... inside Progress component ...
 
 
 // --- Sub-componente: EnhancedAreaChart (Estética Opção B - Storytelling) ---
@@ -319,21 +742,71 @@ const EnhancedAreaChart = ({ data, color = "#10b981", height = 120, targetRange 
 const Progress = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [timeFilter, setTimeFilter] = useState('30d');
+    const [sortBy, setSortBy] = useState('alphabetical'); // 'alphabetical' | 'problems'
+    const [searchTerm, setSearchTerm] = useState('');
     const [exams, setExams] = useState([]);
     const [measurements, setMeasurements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedBiomarker, setSelectedBiomarker] = useState(null);
     const [isInsightDrawerOpen, setIsInsightDrawerOpen] = useState(false);
-    const [isTimelineHighlighted, setIsTimelineHighlighted] = useState(false);
+    const [selectedMarker, setSelectedMarker] = useState(null);
+    const compRef = React.useRef(null);
+    const bioRef = React.useRef(null);
 
-    // Referência para a Timeline
-    const timelineRef = React.useRef(null);
-
-    const scrollToTimeline = () => {
-        timelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setIsTimelineHighlighted(true);
-        setTimeout(() => setIsTimelineHighlighted(false), 2000);
+    const scroll = (ref, direction) => {
+        if (ref.current) {
+            const scrollAmount = direction === 'left' ? -300 : 300;
+            ref.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        }
     };
+
+    // --- Helpers de Dados (Definidos no topo para evitar Reference Errors) ---
+    const getBiomarkerTrend = (name) => {
+        const trend = [];
+        [...exams].reverse().forEach(exam => {
+            const b = exam.analysis?.biomarkers?.find(x => x.name === name);
+            if (b) trend.push({ value: b.value, date: new Date(exam.created_at).toLocaleDateString(), unit: b.unit });
+        });
+        return trend;
+    };
+
+    const getMeasurementTrend = (key) => {
+        const trend = [];
+        const findValue = (obj, targetKey) => {
+            if (!obj || typeof obj !== 'object') return undefined;
+            let item = obj[targetKey];
+            if (typeof item === 'string') {
+                const match = item.match(/([\d.,]+)\s*(.*)/);
+                if (match) return { value: parseFloat(match[1].replace(',', '.')), unit: match[2].trim() || '' };
+            }
+            if (item !== undefined && item !== null) {
+                if (typeof item === 'object' && item.value !== undefined) return item;
+                if (typeof item === 'number') return { value: item, unit: '' };
+            }
+            for (const k in obj) {
+                if (typeof obj[k] === 'object' && obj[k] !== null) {
+                    const found = findValue(obj[k], targetKey);
+                    if (found) return found;
+                }
+            }
+            return undefined;
+        };
+        [...measurements].reverse().forEach(m => {
+            const valData = findValue(m.analysis?.measurements || m.analysis, key);
+            if (valData && valData.value !== null && valData.value !== undefined) {
+                const numericVal = parseFloat(valData.value);
+                if (!isNaN(numericVal)) {
+                    trend.push({
+                        value: numericVal,
+                        date: new Date(m.created_at).toLocaleDateString(),
+                        unit: valData.unit || ''
+                    });
+                }
+            }
+        });
+        return trend;
+    };
+
 
     useEffect(() => {
         const loadAllData = async () => {
@@ -354,15 +827,6 @@ const Progress = () => {
         loadAllData();
     }, []);
 
-    // Helpers para dados
-    const getBiomarkerTrend = (name) => {
-        const trend = [];
-        [...exams].reverse().forEach(exam => {
-            const b = exam.analysis?.biomarkers?.find(x => x.name === name);
-            if (b) trend.push({ value: b.value, date: new Date(exam.created_at).toLocaleDateString(), unit: b.unit });
-        });
-        return trend;
-    };
 
     const biomarkerCards = React.useMemo(() => {
         if (activeTab !== 'labs' || !exams.length) return null;
@@ -407,178 +871,237 @@ const Progress = () => {
             },
         };
 
-        return Array.from(uniqueBiomarkers).map(name => {
-            const trend = getBiomarkerTrend(name);
-            const lastValue = trend[trend.length - 1];
+        const getCategory = (name) => {
+            const n = name.toLowerCase();
+            if (n.includes('glicose') || n.includes('insulina') || n.includes('hba1c') || n.includes('glicada') || n.includes('homa')) return 'Metabólico 🩸';
+            if (n.includes('colesterol') || n.includes('ldl') || n.includes('hdl') || n.includes('triglicer') || n.includes('vldl')) return 'Cardiovascular ❤️';
+            if (n.includes('tsh') || n.includes('t4') || n.includes('testosterona') || n.includes('estradiol') || n.includes('cortisol') || n.includes('horm')) return 'Hormonal 🧬';
+            if (n.includes('pcr') || n.includes('vitamina d') || n.includes('hemoglobina') || n.includes('leucócitos') || n.includes('ferritina') || n.includes('proteína c')) return 'Imunidade & Inflamação 🛡️';
+            if (n.includes('creatinina') || n.includes('ureia') || n.includes('tgo') || n.includes('tgp') || n.includes('gama gt') || n.includes('bilirrubina')) return 'Função Renal & Hepática 🧪';
+            return 'Geral ✨';
+        };
 
-            if (!lastValue) return null;
+        const cardsData = Array.from(uniqueBiomarkers)
+            .filter(name => name.toLowerCase().includes(searchTerm.toLowerCase()))
+            .map(name => {
+                const trend = getBiomarkerTrend(name);
+                const lastValue = trend[trend.length - 1];
 
-            const meta = metadata[name] || {
-                technical: 'Biomarcador',
-                description: 'Acompanhamento da evolução clínica.',
-                icon: FlaskConical,
-                color: '#8b5cf6',
-                target: null,
-                action: 'Ver Detalhes'
-            };
+                if (!lastValue) return null;
 
-            // CORREÇÃO: Usar 'exams' do escopo (que agora está garantido pelo useMemo depender de [exams])
-            const latestExam = exams.find(e => e.analysis?.biomarkers?.some(b => b.name === name));
-            const latestBiomarkerData = latestExam?.analysis?.biomarkers?.find(b => b.name === name);
+                const meta = metadata[name] || {
+                    technical: 'Biomarcador',
+                    description: 'Acompanhamento da evolução clínica.',
+                    icon: FlaskConical,
+                    color: '#8b5cf6',
+                    target: null,
+                    action: 'Ver Detalhes'
+                };
 
-            let parsedTarget = null;
-            if (latestBiomarkerData?.reference) {
-                parsedTarget = parseReferenceRange(latestBiomarkerData.reference);
-            }
-            if (!parsedTarget && meta.target) {
-                parsedTarget = meta.target;
-            }
+                const latestExam = exams.find(e => e.analysis?.biomarkers?.some(b => b.name === name));
+                const latestBiomarkerData = latestExam?.analysis?.biomarkers?.find(b => b.name === name);
 
-            let calculatedStatus = latestBiomarkerData?.status || 'unknown';
-            const val = parseFloat(lastValue.value);
-
-            if (parsedTarget && !isNaN(val)) {
-                const [min, max] = parsedTarget;
-                if (min !== null && max !== null) {
-                    if (val >= min && val <= max) calculatedStatus = 'normal';
-                    else if (val < min) calculatedStatus = 'low';
-                    else calculatedStatus = 'high';
+                let parsedTarget = null;
+                if (latestBiomarkerData?.reference) {
+                    parsedTarget = parseReferenceRange(latestBiomarkerData.reference);
                 }
-                else if (min !== null && max === null) {
-                    if (val >= min) calculatedStatus = 'normal';
-                    else calculatedStatus = 'low';
+                if (!parsedTarget && meta.target) {
+                    parsedTarget = meta.target;
                 }
-                else if (min === null && max !== null) {
-                    if (val <= max) calculatedStatus = 'normal';
-                    else calculatedStatus = 'high';
+
+                let calculatedStatus = latestBiomarkerData?.status || 'unknown';
+                const val = parseFloat(lastValue.value);
+
+                if (parsedTarget && !isNaN(val)) {
+                    const [min, max] = parsedTarget;
+                    if (min !== null && max !== null) {
+                        if (val >= min && val <= max) calculatedStatus = 'normal';
+                        else if (val < min) calculatedStatus = 'low';
+                        else calculatedStatus = 'high';
+                    }
+                    else if (min !== null && max === null) {
+                        if (val >= min) calculatedStatus = 'normal';
+                        else calculatedStatus = 'low';
+                    }
+                    else if (min === null && max !== null) {
+                        if (val <= max) calculatedStatus = 'normal';
+                        else calculatedStatus = 'high';
+                    }
                 }
+
+                const statusMap = {
+                    normal: { label: 'IDEAL', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400', icon: CheckCircle2, priority: 3 },
+                    high: { label: 'ALTO', color: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400', icon: AlertCircle, priority: 1 },
+                    low: { label: 'BAIXO', color: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400', icon: AlertCircle, priority: 1 },
+                    unknown: { label: 'ANÁLISE', color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/20 dark:text-zinc-400', icon: Info, priority: 2 }
+                };
+
+                const statusConfig = statusMap[calculatedStatus] || statusMap.unknown;
+                const cardColor = (calculatedStatus === 'normal') ? '#10b981' : (calculatedStatus === 'high' || calculatedStatus === 'low') ? '#ef4444' : meta.color;
+
+                const biomarkerData = {
+                    label: name,
+                    technical: meta.technical,
+                    value: lastValue.value,
+                    unit: lastValue.unit,
+                    color: cardColor,
+                    icon: meta.icon,
+                    status: calculatedStatus === 'normal' ? 'success' : 'danger',
+                    trend: trend,
+                    target: parsedTarget,
+                    calculatedStatus,
+                    statusConfig,
+                    lastValue,
+                    priority: statusConfig.priority,
+                    category: getCategory(name)
+                };
+
+                return biomarkerData;
+            }).filter(Boolean);
+
+        // Sorting logic
+        const sortedCards = [...cardsData].sort((a, b) => {
+            if (sortBy === 'problems') {
+                if (a.priority !== b.priority) return a.priority - b.priority;
             }
+            return a.label.localeCompare(b.label);
+        });
 
-            const statusMap = {
-                normal: { label: 'IDEAL', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400', icon: CheckCircle2 },
-                high: { label: 'ALTO', color: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400', icon: AlertCircle },
-                low: { label: 'BAIXO', color: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400', icon: AlertCircle },
-                unknown: { label: 'ANÁLISE', color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/20 dark:text-zinc-400', icon: Info }
-            };
+        // Group by category
+        const groups = sortedCards.reduce((acc, card) => {
+            if (!acc[card.category]) acc[card.category] = [];
+            acc[card.category].push(card);
+            return acc;
+        }, {});
 
-            const statusConfig = statusMap[calculatedStatus] || statusMap.unknown;
-            const cardColor = (calculatedStatus === 'normal') ? '#10b981' : (calculatedStatus === 'high' || calculatedStatus === 'low') ? '#ef4444' : meta.color;
-
-            const biomarkerData = {
-                label: name,
-                technical: meta.technical,
-                value: lastValue.value,
-                unit: lastValue.unit,
-                color: cardColor,
-                icon: meta.icon,
-                status: calculatedStatus === 'normal' ? 'success' : 'danger',
-                trend: trend,
-                target: parsedTarget
-            };
-
+        if (Object.keys(groups).length === 0 && searchTerm) {
             return (
-                <div
-                    key={name}
-                    onClick={() => setSelectedBiomarker(biomarkerData)}
-                    className="p-6 bg-white dark:bg-bg-elevated border border-zinc-200 dark:border-border-subtle rounded-[2rem] hover:shadow-xl transition-all cursor-pointer group"
-                >
-                    <div className="flex items-start justify-between mb-6">
-                        <div className="flex items-center gap-4">
-                            <div className={`p-3 rounded-2xl ${statusConfig.color.split(' ')[0]} bg-opacity-50`}>
-                                <meta.icon className={`w-6 h-6 ${statusConfig.color.split(' ')[1]}`} />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-lg dark:text-white flex items-center gap-2">
-                                    {name}
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest ${statusConfig.color}`}>
-                                        {statusConfig.label}
-                                    </span>
-                                </h3>
-                                <p className="text-zinc-400 text-xs font-medium uppercase tracking-wider">{meta.technical}</p>
-                            </div>
-                        </div>
-                        <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-zinc-400 hover:text-emerald-500">
-                            <ArrowUpRight className="w-5 h-5" />
-                        </button>
-                    </div>
-
-                    <div className="h-32 -mx-2 mb-4">
-                        <EnhancedAreaChart
-                            data={trend}
-                            color={cardColor}
-                            targetRange={parsedTarget}
-                        />
-                    </div>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-border-subtle">
-                        <div>
-                            <div className="flex items-baseline">
-                                <span className="text-2xl font-bold dark:text-white">{formatDisplayValue(lastValue.value)}</span>
-                                <span className="text-sm text-zinc-400 ml-1">{lastValue.unit}</span>
-                            </div>
-                            <p className="text-[10px] text-zinc-500 font-medium mt-1">Em {lastValue.date}</p>
-                        </div>
-                        {parsedTarget && (
-                            <div className="text-right">
-                                <p className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold">Referência</p>
-                                <p className="text-xs font-medium dark:text-zinc-300">
-                                    {parsedTarget[0] === null ? '< ' : ''}{formatDisplayValue(parsedTarget[0])}
-                                    {parsedTarget[0] !== null && parsedTarget[1] !== null ? ' - ' : ''}
-                                    {parsedTarget[1] === null ? ' > ' : ''}{formatDisplayValue(parsedTarget[1])}
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                <div className="col-span-full py-20 text-center">
+                    <Search className="w-12 h-12 text-zinc-200 dark:text-zinc-800 mx-auto mb-4" />
+                    <p className="text-zinc-500 font-medium">Nenhum indicador encontrado para "{searchTerm}"</p>
                 </div>
             );
-        });
-    }, [exams, activeTab]);
+        }
 
-    const getMeasurementTrend = (key) => {
-        const trend = [];
-        [...measurements].reverse().forEach(m => {
-            const val = m.analysis?.measurements?.[key];
-            if (val && typeof val === 'object' && val.value !== undefined) {
-                trend.push({
-                    value: val.value,
-                    date: new Date(m.created_at).toLocaleDateString(),
-                    unit: val.unit
-                });
-            }
-        });
-        return trend;
-    };
+        return Object.entries(groups).map(([category, cards]) => (
+            <div key={category} className="col-span-full space-y-4 mb-8">
+                <div className="flex items-center gap-2 px-2">
+                    <div className="h-px flex-1 bg-zinc-100 dark:bg-border-subtle" />
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">{category}</h4>
+                    <div className="h-px flex-1 bg-zinc-100 dark:bg-border-subtle" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {cards.map(data => {
+                        const { label, icon: Icon, statusConfig, trend, target, lastValue, technical, color } = data;
+
+                        return (
+                            <div
+                                key={label}
+                                onClick={() => setSelectedBiomarker(data)}
+                                className="p-6 bg-white dark:bg-bg-elevated border border-zinc-200 dark:border-border-subtle rounded-[2rem] hover:shadow-xl transition-all cursor-pointer group"
+                            >
+                                <div className="flex items-start justify-between mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-2xl ${statusConfig.color.split(' ')[0]} bg-opacity-50`}>
+                                            <Icon className={`w-6 h-6 ${statusConfig.color.split(' ')[1]}`} style={{ color: color }} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg dark:text-white flex items-center gap-2">
+                                                {label}
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest ${statusConfig.color}`}>
+                                                    {statusConfig.label}
+                                                </span>
+                                            </h3>
+                                            <p className="text-zinc-400 text-xs font-medium uppercase tracking-wider">{technical}</p>
+                                        </div>
+                                    </div>
+                                    <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-zinc-400 hover:text-emerald-500">
+                                        <ArrowUpRight className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <div className="h-32 -mx-2 mb-4">
+                                    <EnhancedAreaChart
+                                        data={trend}
+                                        color={color}
+                                        targetRange={target}
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-border-subtle">
+                                    <div>
+                                        <div className="flex items-baseline">
+                                            <span className="text-2xl font-bold dark:text-white">{formatDisplayValue(lastValue.value)}</span>
+                                            <span className="text-sm text-zinc-400 ml-1">{lastValue.unit}</span>
+                                        </div>
+                                        <p className="text-[10px] text-zinc-500 font-medium mt-1">Em {lastValue.date}</p>
+                                    </div>
+                                    {target && (
+                                        <div className="text-right">
+                                            <p className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold">Referência</p>
+                                            <p className="text-xs font-medium dark:text-zinc-300">
+                                                {target[0] === null ? '< ' : ''}
+                                                {target[0] !== null ? formatDisplayValue(target[0]) : ''}
+                                                {target[0] !== null && target[1] !== null ? ' - ' : ''}
+                                                {target[1] === null ? ' > ' : ''}
+                                                {target[1] !== null ? formatDisplayValue(target[1]) : ''}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        ));
+    }, [exams, activeTab, sortBy, searchTerm]);
+
 
     const physicalCards = React.useMemo(() => {
         if (!measurements.length) return null;
 
         const uniqueMeasurementKeys = new Set();
         measurements.forEach(m => {
-            if (m.analysis?.measurements) {
-                Object.keys(m.analysis.measurements).forEach(key => uniqueMeasurementKeys.add(key));
+            const data = m.analysis?.measurements || m.analysis;
+            if (data && typeof data === 'object') {
+                Object.keys(data).forEach(key => {
+                    // Filtrar chaves que não são medidas
+                    if (!['summary', 'recommendations', 'bmi', 'goal', 'previousInjuries', 'trainingDuration', 'trainingFrequency', 'sportsHistory', 'performanceIndicators'].includes(key)) {
+                        uniqueMeasurementKeys.add(key);
+                    }
+                });
             }
         });
 
         const metadata = {
             weight: { label: 'Peso', icon: Scale, color: '#8b5cf6', defaultStatus: 'ESTÁVEL' },
             bodyFat: { label: 'Gordura Corporal', icon: Activity, color: '#ec4899', defaultStatus: 'EVOLUINDO' },
+            bodyFatPercentage: { label: 'Gordura Corporal', icon: Activity, color: '#ec4899', defaultStatus: 'EVOLUINDO' },
             waist: { label: 'Cintura', icon: Target, color: '#10b981', defaultStatus: 'REDUZINDO' },
+            waistCircumference: { label: 'Cintura', icon: Target, color: '#10b981', defaultStatus: 'REDUZINDO' },
             hip: { label: 'Quadril', icon: Activity, color: '#3b82f6', defaultStatus: 'NORMAL' },
             height: { label: 'Altura', icon: Ruler, color: '#6366f1', defaultStatus: 'FIXO' },
             chest: { label: 'Tórax', icon: Activity, color: '#f59e0b', defaultStatus: 'NORMAL' },
             abdomen: { label: 'Abdominal', icon: Target, color: '#10b981', defaultStatus: 'MONITORANDO' },
             imc: { label: 'IMC', icon: Scale, color: '#ef4444', defaultStatus: 'MONITORANDO' },
             muscleMass: { label: 'Massa Muscular', icon: Activity, color: '#10b981', defaultStatus: 'EVOLUINDO' },
+            fatMass: { label: 'Massa Gorda', icon: Activity, color: '#ec4899', defaultStatus: 'REDUZINDO' },
+            leanMass: { label: 'Massa Magra', icon: Activity, color: '#6366f1', defaultStatus: 'AUMENTANDO' },
             visceralFat: { label: 'Gordura Visceral', icon: AlertCircle, color: '#ef4444', defaultStatus: 'ATENÇÃO' },
             water: { label: 'Água Corporal', icon: Activity, color: '#3b82f6', defaultStatus: 'NORMAL' },
-            boneMass: { label: 'Massa Óssea', icon: Activity, color: '#6366f1', defaultStatus: 'FIXO' }
+            totalBodyWater: { label: 'Água Corporal', icon: Activity, color: '#3b82f6', defaultStatus: 'NORMAL' },
+            boneMass: { label: 'Massa Óssea', icon: Activity, color: '#6366f1', defaultStatus: 'FIXO' },
+            metabolicAge: { label: 'Idade Metabólica', icon: Activity, color: '#f59e0b', defaultStatus: 'ESTÁVEL' },
+            gripStrength: { label: 'Força de Preensão', icon: Activity, color: '#10b981', defaultStatus: 'AUMENTANDO' },
+            flexibility: { label: 'Flexibilidade', icon: Ruler, color: '#3b82f6', defaultStatus: 'MELHORANDO' }
         };
 
         const getFriendlyLabel = (key) => {
             const entry = metadata[key];
             if (entry) return entry.label;
 
-            // Tradução dinâmica melhorada
+            // Tradução dinâmica e tratamento de camelCase
             let label = key
                 .replace(/([A-Z])/g, ' $1')
                 .replace(/^./, str => str.toUpperCase())
@@ -586,74 +1109,89 @@ const Progress = () => {
                 .replace('Thigh', 'Coxa')
                 .replace('Calf', 'Panturrilha')
                 .replace('Forearm', 'Antebraço')
+                .replace('Leg', 'Perna')
                 .replace('Right', 'Direito')
                 .replace('Left', 'Esquerdo')
                 .replace('Mass', 'Massa')
                 .replace('Fat', 'Gordura')
                 .replace('Torax', 'Tórax')
-                .replace('BasalMetabolicRate', 'Taxa Metabólica Basal')
+                .replace('Basal Metabolic Rate', 'Taxa Metabólica Basal')
+                .replace('Bmr', 'TMB')
                 .trim();
 
-            // Ajuste de gênero para Coxa
-            if (label.includes('Coxa')) {
+            // Ajuste de gênero para Coxa e Panturrilha
+            if (label.includes('Coxa') || label.includes('Panturrilha')) {
                 label = label.replace('Direito', 'Direita').replace('Esquerdo', 'Esquerda');
             }
 
             return label;
         };
 
-        const cards = Array.from(uniqueMeasurementKeys).map(key => {
-            const trend = getMeasurementTrend(key);
-            const lastData = trend[trend.length - 1];
-            if (!lastData) return null;
+        const cards = Array.from(uniqueMeasurementKeys)
+            .filter(key => {
+                const label = getFriendlyLabel(key);
+                return label.toLowerCase().includes(searchTerm.toLowerCase());
+            })
+            .map(key => {
+                const trend = getMeasurementTrend(key);
+                const lastData = trend[trend.length - 1];
+                if (!lastData) return null;
 
-            const meta = metadata[key] || {
-                label: getFriendlyLabel(key),
-                icon: Activity,
-                color: '#6366f1',
-                defaultStatus: 'REGISTRADO'
-            };
+                const meta = metadata[key] || {
+                    label: getFriendlyLabel(key),
+                    icon: Activity,
+                    color: '#6366f1',
+                    defaultStatus: 'REGISTRADO'
+                };
 
-            let status = meta.defaultStatus || 'REGISTRADO';
-            if (trend.length >= 2) {
-                const prevValue = parseFloat(trend[trend.length - 2].value);
-                const currValue = parseFloat(lastData.value);
-                if (key === 'weight' || key === 'bodyFat' || key === 'waist') {
-                    if (currValue < prevValue) status = 'EXCELENTE';
-                    else if (currValue > prevValue) status = 'ATENÇÃO';
-                } else if (key === 'arm' || key === 'thigh') {
-                    if (currValue > prevValue) status = 'CRESCENDO';
+                let status = meta.defaultStatus || 'REGISTRADO';
+                if (trend.length >= 2) {
+                    const prevValue = parseFloat(trend[trend.length - 2].value);
+                    const currValue = parseFloat(lastData.value);
+                    if (key === 'weight' || key === 'bodyFat' || key === 'waist') {
+                        if (currValue < prevValue) status = 'EXCELENTE';
+                        else if (currValue > prevValue) status = 'ATENÇÃO';
+                    } else if (key === 'arm' || key === 'thigh') {
+                        if (currValue > prevValue) status = 'CRESCENDO';
+                    }
                 }
-            }
 
-            // Preparar dados para o Drawer
-            const biomarkerData = {
-                label: meta.label,
-                technical: meta.label.toUpperCase(),
-                icon: meta.icon,
-                color: meta.color,
-                value: lastData.value,
-                unit: lastData.unit,
-                trend: trend,
-                status: status === 'EXCELENTE' || status === 'NORMAL' ? 'success' :
-                    status === 'ATENÇÃO' ? 'danger' : 'warning'
-            };
+                // Preparar dados para o Drawer
+                const biomarkerData = {
+                    label: meta.label,
+                    technical: meta.label.toUpperCase(),
+                    icon: meta.icon,
+                    color: meta.color,
+                    value: lastData.value,
+                    unit: lastData.unit,
+                    trend: trend,
+                    status: status === 'EXCELENTE' || status === 'NORMAL' ? 'success' :
+                        status === 'ATENÇÃO' ? 'danger' : 'warning'
+                };
 
-            const displayValue = formatDisplayValue(lastData.value);
+                const displayValue = formatDisplayValue(lastData.value);
 
-            return {
-                key,
-                label: meta.label,
-                meta,
-                biomarkerData,
-                displayValue,
-                lastData,
-                status,
-                trend
-            };
-        })
+                return {
+                    key,
+                    label: meta.label,
+                    meta,
+                    biomarkerData,
+                    displayValue,
+                    lastData,
+                    status,
+                    trend
+                };
+            })
             .filter(Boolean)
-            .sort((a, b) => a.label.localeCompare(b.label));
+            .sort((a, b) => {
+                if (sortBy === 'problems') {
+                    // status 'ATENÇÃO' tem prioridade 1, outros prioridade 2
+                    const aPrio = a.status === 'ATENÇÃO' ? 1 : 2;
+                    const bPrio = b.status === 'ATENÇÃO' ? 1 : 2;
+                    if (aPrio !== bPrio) return aPrio - bPrio;
+                }
+                return a.label.localeCompare(b.label);
+            });
 
         return cards.map(({ key, label, meta, biomarkerData, displayValue, lastData, status, trend }) => (
             <div key={key} className="p-8 bg-zinc-50/50 dark:bg-bg-secondary rounded-[3rem] border border-zinc-200 dark:border-border-subtle space-y-6">
@@ -693,7 +1231,140 @@ const Progress = () => {
                 </div>
             </div>
         ));
-    }, [measurements, activeTab]);
+    }, [measurements, activeTab, sortBy, searchTerm]);
+
+    const detectedInsights = React.useMemo(() => {
+        if (!exams.length || !measurements.length) return [];
+
+        const insights = [];
+
+        // 1. Correlação: Peso vs Glicose
+        const wTrend = getMeasurementTrend('weight');
+        const gTrend = getBiomarkerTrend('Glicose');
+
+        if (wTrend.length >= 2 && gTrend.length >= 2) {
+            const wDiff = wTrend[wTrend.length - 1].value - wTrend[wTrend.length - 2].value;
+            const gDiff = parseFloat(gTrend[gTrend.length - 1].value) - parseFloat(gTrend[gTrend.length - 2].value);
+
+            if (wDiff < 0 && gDiff < 0) {
+                insights.push({
+                    title: 'Melhora Metabólica',
+                    description: 'A redução de peso está correlacionada com a queda na sua glicemia. Ótimo sinal de sensibilidade insulínica!',
+                    icon: Zap,
+                    theme: 'success'
+                });
+            }
+        }
+
+        // 2. Correlação: Recomposição (Gordura vs Massa Muscular)
+        const fTrend = getMeasurementTrend('bodyFat');
+        const mTrend = getMeasurementTrend('muscleMass');
+
+        if (fTrend.length >= 2 && mTrend.length >= 2) {
+            const fDiff = fTrend[fTrend.length - 1].value - fTrend[fTrend.length - 2].value;
+            const mDiff = mTrend[mTrend.length - 1].value - mTrend[mTrend.length - 2].value;
+
+            if (fDiff < 0 && mDiff > 0) {
+                insights.push({
+                    title: 'Recomposição Ativa',
+                    description: 'Você está perdendo gordura e ganhando massa muscular simultaneamente. Excelente qualidade de treino e dieta!',
+                    icon: Sparkles,
+                    theme: 'success'
+                });
+            }
+        }
+
+        // 3. Alerta: Colesterol total subindo
+        const cTrend = getBiomarkerTrend('Colesterol Total');
+        if (cTrend.length >= 2) {
+            const cDiff = parseFloat(cTrend[cTrend.length - 1].value) - parseFloat(cTrend[cTrend.length - 2].value);
+            if (cDiff > 10) {
+                insights.push({
+                    title: 'Atenção Lipídica',
+                    description: 'Houve um aumento recente no seu colesterol. Vale revisar a ingestão de gorduras saturadas.',
+                    icon: BrainCircuit,
+                    theme: 'warning'
+                });
+            }
+        }
+
+        // 4. Nova: Deficiência de Vitamina D
+        const vTrend = getBiomarkerTrend('Vitamina D');
+        if (vTrend.length > 0) {
+            const lastV = parseFloat(vTrend[vTrend.length - 1].value);
+            if (lastV < 30) {
+                insights.push({
+                    title: 'Vitamina D em Alerta',
+                    description: 'Seu nível atual está abaixo do ideal. Isso pode impactar sua imunidade e absorção de cálcio.',
+                    icon: AlertCircle,
+                    theme: 'warning',
+                    priority: 1
+                });
+            }
+        }
+
+        // 5. Nova: Estabilidade Glicêmica
+        const glucTrend = getBiomarkerTrend('Glicose');
+        if (glucTrend.length >= 3) {
+            const values = glucTrend.slice(-3).map(v => parseFloat(v.value));
+            const variance = Math.max(...values) - Math.min(...values);
+            if (variance < 5) {
+                insights.push({
+                    title: 'Controle Glicêmico Nota 10',
+                    description: 'Sua glicose tem se mantido extremamente estável nos últimos exames. Excelente sinal de saúde metabólica.',
+                    icon: CheckCircle2,
+                    theme: 'success',
+                    priority: 3
+                });
+            }
+        }
+
+        // 6. Nova: Hidratação Celular (Baseado em Água)
+        const waterTrend = getMeasurementTrend('water');
+        if (waterTrend.length > 0) {
+            const lastW = waterTrend[waterTrend.length - 1]?.value;
+            if (lastW > 50) { // Ex: acima de 50% de água
+                insights.push({
+                    title: 'Hidratação Otimizada',
+                    description: 'Sua composição de água corporal está excelente, favorecendo a recuperação muscular e transporte de nutrientes.',
+                    icon: Zap,
+                    theme: 'success',
+                    priority: 3
+                });
+            }
+        }
+
+        // --- Lógica de Fallback: Garantir pelo menos 3 cards ---
+        if (insights.length < 3) {
+            insights.push({
+                title: 'Monitoramento Contínuo',
+                description: 'A IA Nutrixo está processando seu histórico. Mantenha a frequência de registros para análises mais profundas.',
+                icon: Activity,
+                theme: 'success',
+                priority: 4
+            });
+        }
+
+        if (insights.length < 3) {
+            insights.push({
+                title: 'Consistência Nutricional',
+                description: 'Seus dados de biomarcadores mostram uma adesão sólida ao plano de micronutrientes.',
+                icon: CheckCircle2,
+                theme: 'success',
+                priority: 5
+            });
+        }
+
+        // Adiciona prioridade básica aos anteriores se não tiverem e força o tema 'success' para consistência visual
+        insights.forEach(insight => {
+            if (!insight.priority) insight.priority = insight.theme === 'warning' ? 1 : 2;
+            insight.theme = 'success'; // Padroniza para o visual Emerald solicitado
+        });
+
+        // Ordenar por prioridade (1 é maior prioridade) e limitar ou garantir os 3
+        const sorted = insights.sort((a, b) => a.priority - b.priority);
+        return sorted.slice(0, Math.max(3, sorted.length));
+    }, [exams, measurements]);
 
     if (isLoading) {
         return (
@@ -709,8 +1380,10 @@ const Progress = () => {
     const vitDTrend = getBiomarkerTrend('Vitamina D');
     const glucoseTrend = getBiomarkerTrend('Glicose');
 
+
     return (
         <div className="max-w-5xl mx-auto space-y-6 pb-20">
+
             {/* Header com Filtro de Período */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -720,19 +1393,54 @@ const Progress = () => {
                     <p className="text-zinc-500 text-sm">Entenda como sua saúde evoluiu nos últimos {timeFilter === '30d' ? '30 dias' : timeFilter === '90d' ? '90 dias' : '365 dias'}.</p>
                 </div>
 
-                <div className="flex items-center gap-2 p-1.5 bg-zinc-100 dark:bg-bg-secondary rounded-2xl border border-zinc-200 dark:border-border-subtle shadow-inner">
-                    {['30d', '90d', '1y'].map(period => (
-                        <button
-                            key={period}
-                            onClick={() => setTimeFilter(period)}
-                            className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${timeFilter === period
-                                ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
-                                : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
-                                }`}
-                        >
-                            {period}
-                        </button>
-                    ))}
+                <div className="flex flex-wrap items-center gap-4">
+                    {activeTab !== 'overview' && (
+                        <div className="relative group">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 group-focus-within:text-emerald-500 transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Buscar indicador..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 pr-4 py-2 bg-zinc-100 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all w-full md:w-48 dark:text-white"
+                            />
+                        </div>
+                    )}
+
+                    {activeTab !== 'overview' && (
+                        <div className="flex items-center gap-2 p-1.5 bg-zinc-100 dark:bg-bg-secondary rounded-2xl border border-zinc-200 dark:border-border-subtle shadow-inner">
+                            {[
+                                { id: 'alphabetical', label: 'AZ' },
+                                { id: 'problems', label: 'Problemas' }
+                            ].map(opt => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => setSortBy(opt.id)}
+                                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sortBy === opt.id
+                                        ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
+                                        : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                                        }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2 p-1.5 bg-zinc-100 dark:bg-bg-secondary rounded-2xl border border-zinc-200 dark:border-border-subtle shadow-inner">
+                        {['30d', '90d', '1y'].map(period => (
+                            <button
+                                key={period}
+                                onClick={() => setTimeFilter(period)}
+                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${timeFilter === period
+                                    ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
+                                    : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                                    }`}
+                            >
+                                {period}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -764,79 +1472,260 @@ const Progress = () => {
                 {activeTab === 'overview' && (
                     <motion.div
                         key="overview"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="space-y-6"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="space-y-12 relative"
                     >
-                        {/* Seção de Insights IA (Storytelling) */}
-                        <div className="p-8 bg-zinc-900 dark:bg-bg-elevated rounded-[2.5rem] border border-zinc-800 dark:border-border-subtle shadow-2xl relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full -mr-32 -mt-32 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-                            <div className="flex items-start gap-6 relative z-10">
-                                <div className="p-4 bg-emerald-500/20 rounded-2xl">
-                                    <Target className="w-8 h-8 text-emerald-400" />
-                                </div>
-                                <div className="flex-1 space-y-2">
-                                    <div className="flex items-center gap-3">
-                                        <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-black uppercase tracking-widest">Insight da Nutrixo</span>
-                                        <span className="text-zinc-500 text-[10px] font-mono">Há 2 minutos</span>
+                        <ScannerLine />
+
+                        <div className="space-y-12">
+                            <div className="space-y-4">
+                                <AILogTerminal />
+                            </div>
+
+                            {/* Main Analysis Card (Sentinela Briefing) */}
+                            <motion.div
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                className="p-10 bg-zinc-900 border border-zinc-800 rounded-[3.5rem] shadow-2xl relative overflow-hidden group"
+                            >
+                                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full -mr-64 -mt-64 blur-[120px]" />
+
+                                <div className="flex flex-col lg:flex-row items-center gap-12 relative z-10">
+                                    <div className="flex-1 space-y-8">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3.5 bg-emerald-500/20 rounded-[1.5rem]">
+                                                <BrainCircuit className="w-6 h-6 text-emerald-400" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500/80 mb-1">Briefing Executivo de Saúde</h2>
+                                                <p className="text-zinc-500 text-[10px] font-mono">Consistência de dados: 100% | Último processamento: Hoje</p>
+                                            </div>
+                                        </div>
+
+                                        <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight tracking-tight">
+                                            Sua meta de gordura corporal está <span className="text-emerald-400">75% concluída</span>.
+                                        </h1>
+
+                                        <p className="text-lg text-zinc-400 leading-relaxed max-w-2xl">
+                                            A redução de 1.2% observada em massa gorda este mês é diretamente proporcional ao aumento da sua flexibilidade metabólica. Seus níveis de Vitamina D estão em zona de manutenção ideal.
+                                        </p>
+
+                                        <div className="flex flex-wrap items-center gap-6 pt-4 border-t border-white/5">
+                                            <button className="px-8 py-3.5 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                                                Visualizar Plano Otimizado
+                                                <ArrowRight className="w-4 h-4" />
+                                            </button>
+                                            <div className="flex items-center gap-3 text-zinc-500 text-xs font-medium">
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-500/50" />
+                                                Sincronizado com 12 biomarcadores
+                                            </div>
+                                        </div>
                                     </div>
-                                    <h2 className="text-xl font-bold text-white leading-tight">Você está no caminho certo para sua meta de gordura corporal.</h2>
-                                    <p className="text-zinc-400 text-sm leading-relaxed max-w-2xl">
-                                        Identificamos uma redução consistente de 1.2% na gordura corporal este mês. Isso reflete o ajuste proteico recente no seu plano. A Glicose em jejum também acompanhou essa queda, o que é um sinal excelente de flexibilidade metabólica.
-                                    </p>
-                                    <div className="pt-4 flex items-center gap-6">
-                                        <button
-                                            onClick={() => setIsInsightDrawerOpen(true)}
-                                            className="flex items-center gap-2 text-emerald-400 text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
-                                        >
-                                            Dica Plano Alimentar <ArrowRight className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                            onClick={scrollToTimeline}
-                                            className="flex items-center gap-2 text-zinc-400 text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
-                                        >
-                                            Histórico Completo <History className="w-3 h-3" />
-                                        </button>
+
+                                    <div className="lg:pr-8">
+                                        <AIScanCore />
+                                    </div>
+                                </div>
+                            </motion.div>
+
+                            {/* Clusters de Saúde (Visão 360) */}
+                            <div className="space-y-16">
+                                {/* Grupo 1: Físico & Composição */}
+                                <div className="space-y-8">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <Scale className="w-5 h-5 text-zinc-400" />
+                                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Composição Corporal</h3>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest bg-zinc-100 dark:bg-white/5 px-2 py-1 rounded-lg">Rolagem Horizontal</span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => scroll(compRef, 'left')}
+                                                    className="p-2 bg-zinc-100 dark:bg-white/5 rounded-xl hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+                                                >
+                                                    <ChevronLeft className="w-4 h-4 text-zinc-500" />
+                                                </button>
+                                                <button
+                                                    onClick={() => scroll(compRef, 'right')}
+                                                    className="p-2 bg-zinc-100 dark:bg-white/5 rounded-xl hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+                                                >
+                                                    <ChevronRight className="w-4 h-4 text-zinc-500" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div
+                                        ref={compRef}
+                                        className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide snap-x"
+                                    >
+                                        {(() => {
+                                            if (!measurements.length) return null;
+                                            const latest = measurements[0];
+                                            const data = latest.analysis?.measurements || latest.analysis;
+                                            if (!data) return null;
+
+                                            const keys = Object.keys(data).filter(k =>
+                                                !['summary', 'recommendations', 'bmi', 'goal', 'previousInjuries', 'trainingDuration', 'trainingFrequency', 'sportsHistory', 'performanceIndicators'].includes(k)
+                                            );
+
+                                            const mappedItems = keys.map(key => {
+                                                const trendData = getMeasurementTrend(key);
+                                                const lastVal = trendData[trendData.length - 1];
+                                                const meta = {
+                                                    weight: { label: 'Peso', icon: Scale, color: '#10b981' },
+                                                    bodyFat: { label: 'Gordura corporal', icon: Activity, color: '#8b5cf6' },
+                                                    muscleMass: { label: 'Massa Magra', icon: Zap, color: '#3b82f6' },
+                                                    imc: { label: 'IMC', icon: Target, color: '#6366f1' },
+                                                    waist: { label: 'Cintura', icon: Ruler, color: '#10b981' },
+                                                    height: { label: 'Altura', icon: Ruler, color: '#3b82f6' },
+                                                    neck: { label: 'Pescoço', icon: Ruler, color: '#8b5cf6' },
+                                                    chest: { label: 'Peito', icon: Ruler, color: '#6366f1' },
+                                                    belly: { label: 'Abdômen', icon: Ruler, color: '#f59e0b' },
+                                                    hips: { label: 'Quadril', icon: Ruler, color: '#0ea5e9' },
+                                                };
+
+                                                const entry = meta[key] || {
+                                                    label: translateLabel(key),
+                                                    icon: Activity,
+                                                    color: '#94a3b8'
+                                                };
+
+                                                return { key, entry, lastVal, trendData };
+                                            });
+
+                                            // Ordenação Alfabética por Rótulo Traduzido
+                                            mappedItems.sort((a, b) => a.entry.label.localeCompare(b.entry.label, 'pt-BR'));
+
+                                            // Deduplicação por Label Traduzido
+                                            const uniqueMap = new Map();
+                                            mappedItems.forEach(item => {
+                                                const label = item.entry.label;
+                                                // Se já existe, mantemos o que tem valor definido, ou o mais recente, ou simplesmente ignoramos o duplicado
+                                                // Aqui vamos assumir que se já existe, não sobrescrevemos, a menos que o novo tenha dados e o antigo não (embora filtering acima já garanta dados)
+                                                if (!uniqueMap.has(label)) {
+                                                    uniqueMap.set(label, item);
+                                                } else {
+                                                    // Opcional: Lógica de "merge" ou escolha do melhor dado
+                                                    const existing = uniqueMap.get(label);
+                                                    // Se o item atual tem data mais recente que o existente, substitui (assumindo que created_at está disponível e parseável, mas aqui estamos pegando do 'latest' que é o mesmo objeto pai)
+                                                    // Como a origem é 'latest', todos têm a mesma data base.
+                                                    // Então é duplicidade de chaves diferentes mapeando para mesmo nome (ex: muscleMass e leanBodyMass)
+                                                    // Preferência: chaves que não sejam 'mass' genéricas se houver conflito?
+                                                    // Simplesmente manter o primeiro encontrado (que foi ordenado alfabeticamente)
+                                                }
+                                            });
+
+                                            return Array.from(uniqueMap.values()).map((item, i) => (
+                                                <SentinelCard
+                                                    key={item.key}
+                                                    label={item.entry.label}
+                                                    value={item.lastVal?.value}
+                                                    unit={item.lastVal?.unit || ''}
+                                                    trend={item.lastVal ? 'Detectado' : 'Estável'}
+                                                    status="success"
+                                                    color={item.entry.color}
+                                                    icon={item.entry.icon}
+                                                    date={latest.created_at}
+                                                    history={item.trendData}
+                                                    delay={0.1 * i}
+                                                    onClick={() => setSelectedMarker({
+                                                        label: item.entry.label,
+                                                        value: item.lastVal?.value,
+                                                        unit: item.lastVal?.unit || '',
+                                                        history: item.trendData,
+                                                        date: latest.created_at
+                                                    })}
+                                                />
+                                            ));
+                                        })()}
+                                    </div>
+                                </div>
+
+                                {/* Grupo 2: Marcadores Vitais (Laboratório) */}
+                                <div className="space-y-8">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <FlaskConical className="w-5 h-5 text-zinc-400" />
+                                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Bio-Hacking & Vitalidade</h3>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest bg-zinc-100 dark:bg-white/5 px-2 py-1 rounded-lg">Rolagem Horizontal</span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => scroll(bioRef, 'left')}
+                                                    className="p-2 bg-zinc-100 dark:bg-white/5 rounded-xl hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+                                                >
+                                                    <ChevronLeft className="w-4 h-4 text-zinc-500" />
+                                                </button>
+                                                <button
+                                                    onClick={() => scroll(bioRef, 'right')}
+                                                    className="p-2 bg-zinc-100 dark:bg-white/5 rounded-xl hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+                                                >
+                                                    <ChevronRight className="w-4 h-4 text-zinc-500" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div
+                                        ref={bioRef}
+                                        className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide snap-x"
+                                    >
+                                        {(() => {
+                                            if (exams.length === 0) return null;
+                                            const latest = exams[0];
+                                            const latestExams = [...(latest.analysis?.biomarkers || [])];
+
+                                            // Ordenação Alfabética por Label Traduzido
+                                            latestExams.sort((a, b) => translateLabel(a.name).localeCompare(translateLabel(b.name), 'pt-BR'));
+
+                                            return Array.from(
+                                                latestExams.reduce((map, exam) => {
+                                                    const label = translateLabel(exam.name);
+                                                    if (!map.has(label)) map.set(label, exam);
+                                                    return map;
+                                                }, new Map()).values()
+                                            ).map((exam, i) => {
+                                                const history = getBiomarkerTrend(exam.name);
+                                                return (
+                                                    <SentinelCard
+                                                        key={i}
+                                                        label={translateLabel(exam.name)}
+                                                        value={exam.value}
+                                                        unit={exam.unit}
+                                                        trend={translateStatus(exam.status)}
+                                                        status={exam.status === 'normal' || !exam.status ? 'success' : 'warning'}
+                                                        color={i % 2 === 0 ? '#3b82f6' : '#f59e0b'}
+                                                        icon={FlaskConical}
+                                                        date={latest.created_at}
+                                                        history={history}
+                                                        delay={0.4 + (0.1 * i)}
+                                                        onClick={() => setSelectedMarker({
+                                                            label: translateLabel(exam.name),
+                                                            value: exam.value,
+                                                            unit: exam.unit,
+                                                            history,
+                                                            date: latest.created_at
+                                                        })}
+                                                    />
+                                                );
+                                            });
+                                        })()}
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <InsightDrawer
-                            isOpen={isInsightDrawerOpen}
-                            onClose={() => setIsInsightDrawerOpen(false)}
-                        />
-
-                        {/* KPI Grid - Compacto e Semântico */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {[
-                                { label: 'Peso Atual', value: weightTrend[weightTrend.length - 1]?.value, unit: 'kg', trend: '-2.4kg', status: 'success', color: '#10b981', icon: Scale, trendLine: weightTrend },
-                                { label: 'Gordura %', value: fatTrend[fatTrend.length - 1]?.value, unit: '%', trend: '-1.5%', status: 'success', color: '#8b5cf6', icon: Activity, trendLine: fatTrend },
-                                { label: 'Vitamina D', value: vitDTrend[vitDTrend.length - 1]?.value, unit: 'ng/mL', trend: '+12%', status: 'warning', color: '#f59e0b', icon: FlaskConical, trendLine: vitDTrend },
-                                { label: 'Glicose', value: glucoseTrend[glucoseTrend.length - 1]?.value, unit: 'mg/dL', trend: 'Estável', status: 'success', color: '#3b82f6', icon: Activity, trendLine: glucoseTrend }
-                            ].map((card, i) => (
-                                <div key={i} className="p-6 bg-white dark:bg-bg-elevated border border-zinc-200 dark:border-border-subtle rounded-[2rem] hover:shadow-xl transition-all cursor-pointer group">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className={`p-2 rounded-xl bg-opacity-10 bg-current`} style={{ color: card.color }}>
-                                            <card.icon className="w-5 h-5" />
-                                        </div>
-                                        <div className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter border ${card.status === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20' :
-                                            'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:border-amber-500/20'
-                                            }`}>
-                                            {card.trend}
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{card.label}</p>
-                                    <h3 className="text-2xl font-mono font-bold dark:text-white mt-1">
-                                        {card.value || '--'}
-                                        <span className="text-sm font-normal text-zinc-400 ml-1">{card.unit}</span>
-                                    </h3>
-                                    <div className="mt-4 h-6 opacity-40 group-hover:opacity-100 transition-opacity">
-                                        <EnhancedAreaChart data={card.trendLine} color={card.color} height={24} showBaseline={false} />
-                                    </div>
+                            {/* IA Footer: Insights Prioritários (v3) */}
+                            <div className="space-y-8 pt-8">
+                                <div className="flex items-center gap-4">
+                                    <BrainCircuit className="w-5 h-5 text-emerald-500" />
+                                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Insights Estratégicos da Sentinela</h3>
+                                    <div className="h-px flex-1 bg-zinc-100 dark:bg-white/5" />
                                 </div>
-                            ))}
+                                <CorrelationInsights insights={detectedInsights} />
+                            </div>
                         </div>
                     </motion.div>
                 )}
@@ -870,82 +1759,6 @@ const Progress = () => {
                 }
             </AnimatePresence >
 
-            {/* Timeline de Saúde - Global fora das tabs */}
-            < div ref={timelineRef} className="pt-4" >
-                <div className={`p-8 bg-white dark:bg-bg-elevated border border-zinc-200 dark:border-border-subtle rounded-[3rem] shadow-sm transition-all duration-700 ${isTimelineHighlighted ? 'ring-4 ring-emerald-500/30 bg-emerald-50/5' : ''}`}>
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
-                                <History className="w-6 h-6 text-zinc-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold dark:text-white uppercase tracking-tight">Timeline de Saúde</h3>
-                                <p className="text-[10px] text-zinc-400 font-mono font-black uppercase tracking-widest">{exams.length} REGISTROS</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        {[
-                            ...exams.map(e => ({ ...e, type: 'exam' })),
-                            ...measurements.map(m => ({ ...m, type: 'measurement' }))
-                        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((event, i) => {
-                            const isExam = event.type === 'exam';
-                            const date = new Date(event.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-                            const mainLabel = isExam ? 'Exame Laboratorial' : 'Avaliação Física';
-                            const Icon = isExam ? FlaskConical : Scale;
-
-                            // Extrair marcador principal para exibição clara
-                            let highlightTitle = "";
-                            let highlightValue = "";
-                            let unit = "";
-
-                            if (isExam) {
-                                const biomarker = event.analysis?.biomarkers?.[0];
-                                highlightTitle = biomarker?.name || "Check-up";
-                                highlightValue = biomarker?.value || "--";
-                                unit = biomarker?.unit || "";
-                            } else {
-                                const weight = event.analysis?.measurements?.weight;
-                                highlightTitle = "Peso Corporal";
-                                highlightValue = weight?.value || "--";
-                                unit = weight?.unit || "kg";
-                            }
-
-                            return (
-                                <div key={i} className="flex items-center gap-6 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-2xl transition-all group">
-                                    <div className={`p-3 rounded-xl ${isExam ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                                        <Icon className="w-5 h-5" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest leading-none">{date}</p>
-                                            <span className={`px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${isExam ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                                                {mainLabel}
-                                            </span>
-                                        </div>
-                                        <h4 className="text-sm font-bold dark:text-white flex items-center gap-2">
-                                            {highlightTitle}
-                                            {isExam && event.analysis?.biomarkers?.length > 1 && (
-                                                <span className="text-[9px] font-medium text-zinc-400">+{event.analysis.biomarkers.length - 1} outros marcadores</span>
-                                            )}
-                                        </h4>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="flex items-center gap-2 justify-end">
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-lg font-mono font-bold dark:text-white">{highlightValue}<span className="text-[10px] font-normal text-zinc-400 ml-1">{unit}</span></span>
-                                                <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Registrado</span>
-                                            </div>
-                                            <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:translate-x-1 transition-transform" />
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div >
 
             {/* Floating Action Hint if data is low */}
             {
@@ -977,6 +1790,13 @@ const Progress = () => {
                 isOpen={!!selectedBiomarker}
                 onClose={() => setSelectedBiomarker(null)}
                 biomarker={selectedBiomarker}
+            />
+
+            {/* Modal de Detalhes do Biomarcador (v4) */}
+            <BiomarkerDetailOverlay
+                isOpen={!!selectedMarker}
+                onClose={() => setSelectedMarker(null)}
+                marker={selectedMarker}
             />
         </div>
     );

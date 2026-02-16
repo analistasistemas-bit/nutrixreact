@@ -153,30 +153,32 @@ export async function analyzeMeasurements(file) {
         messages: [
             {
                 role: 'system',
-                content: `Você é um nutricionista que analisa medidas corporais. Analise o PDF e retorne um JSON válido:
+                content: `Você é um robô de extração de dados antropométricos. Analise o PDF e gere um JSON RÍGIDO.
+
+ESTRUTURA OBRIGATÓRIA:
 {
+  "bmi": { "value": 28.4, "classification": "Sobrepeso" },
   "measurements": {
-    "weight": { "value": 75, "unit": "kg" },
-    "height": { "value": 170, "unit": "cm" },
-    "waist": { "value": 80, "unit": "cm" },
-    "hip": { "value": 95, "unit": "cm" },
-    "chest": { "value": 100, "unit": "cm" },
-    "abdomen": { "value": 85, "unit": "cm" },
-    "armRight": { "value": 32, "unit": "cm" },
-    "armLeft": { "value": 31.5, "unit": "cm" },
-    "thighRight": { "value": 55, "unit": "cm" },
-    "thighLeft": { "value": 54.5, "unit": "cm" },
-    "bodyFat": { "value": 18, "unit": "%" },
-    "muscleMass": { "value": 60, "unit": "kg" },
-    "visceralFat": { "value": 5, "unit": "level" },
-    "basalMetabolicRate": { "value": 1800, "unit": "kcal" }
+    "weight": { "value": 94.2, "unit": "kg" },
+    "height": { "value": 182, "unit": "cm" },
+    "waist": { "value": 98, "unit": "cm" },
+    "bodyFat": { "value": 19, "unit": "%" },
+    "visceralFat": { "value": 12, "unit": "level" },
+    "muscleMass": { "value": 42, "unit": "kg" }
+    // Extraia TODAS as circunferências (armRight, armLeft, thighRight, thighLeft, chest, abdomen, hip, etc)
+    // Siga SEMPRE o padrão: "chave": { "value": numero, "unit": "unidade" }
   },
-  "bmi": { "value": 25.9, "classification": "Sobrepeso" },
-  "waistHipRatio": { "value": 0.84, "classification": "Normal" },
-  "summary": "Resumo detalhado",
-  "recommendations": ["Sugestão 1"]
+  "summary": "Resumo em Português",
+  "recommendations": ["Sugestão em Português"]
 }
-IMPORTANTE: Extraia CADA UM dos indicadores numéricos de saúde e medidas presentes no PDF. NÃO SE LIMITE aos exemplos acima. Se encontrar uma medida nova (ex: "Panturrilha", "Subescapular"), crie uma chave em camelCase (ex: calf, subscapular) e extraia o valor e unidade. NÃO OMITA NADA. Priorize fidelidade total ao relatório. Retorne APENAS o JSON válido sem formatação markdown.`
+
+REGRAS:
+1. Varra TODOS os perímetros, circunferências e dados de composição corporal.
+2. Nomes de chaves em camelCase (ex: armRightContracted, calfLeft).
+3. Use PONTO para decimais.
+4. OMITA a chave se não encontrar o dado no documento.
+5. Se o dado existir, ele DEVE estar no objeto "measurements".
+6. Retorne APENAS o JSON válido.`
             },
             {
                 role: 'user',
