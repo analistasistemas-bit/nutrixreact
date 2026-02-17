@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -10,54 +11,38 @@ import NutritionPlan from './pages/NutritionPlan';
 import Food from './pages/Food';
 import GamerProfile from './pages/GamerProfile';
 import ReloadPrompt from './components/ReloadPrompt';
-import insforge from './lib/insforge';
 
-const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+const AppContent = () => {
+  const { user, isAuthenticated, isLoading, login, logout } = useAuth();
 
-  // Restaurar sessão ao carregar
-  React.useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await insforge.auth.getCurrentSession();
-      if (data?.session) {
-        setCurrentUser(data.session.user);
-        setIsLoggedIn(true);
-      }
-    };
-    checkSession();
-  }, []);
+  // Splash enquanto verifica sessão
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  const handleLogin = (userData) => {
-    setCurrentUser(userData);
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = async () => {
-    await insforge.auth.signOut();
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-  };
-
-  const displayUser = currentUser || {
-    name: 'Diego',
-    email: 'diego@nutrixo.com',
-    avatar: null
-  };
-
-  if (!isLoggedIn) {
+  if (!isAuthenticated) {
     return (
       <>
-        <Login onLogin={handleLogin} />
+        <Login onLogin={(userData, token) => login(userData, token)} />
         <ReloadPrompt />
       </>
     );
   }
 
+  const displayUser = user || {
+    name: 'Usuário',
+    email: 'usuario@nutrixo.com',
+    avatar: null
+  };
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<MainLayout user={displayUser} onLogout={handleLogout} />}>
+        <Route element={<MainLayout user={displayUser} onLogout={logout} />}>
           <Route index element={<Dashboard />} />
           <Route path="labs" element={<Labs />} />
           <Route path="measurements" element={<Measurements />} />
@@ -71,5 +56,11 @@ const App = () => {
     </BrowserRouter>
   );
 };
+
+const App = () => (
+  <AuthProvider>
+    <AppContent />
+  </AuthProvider>
+);
 
 export default App;

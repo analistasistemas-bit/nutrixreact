@@ -68,14 +68,23 @@ const DailyChallenges = () => {
                                 <CheckCircle className="w-5 h-5 text-white" />
                             </motion.div>
                         ) : (
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => completeChallenge(challenge.id)}
-                                className="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs font-bold rounded-lg shadow-sm hover:from-cyan-400 hover:to-blue-400 transition-all"
-                            >
-                                Completar
-                            </motion.button>
+                            <div className="flex flex-col items-end gap-1">
+                                <span className="text-[10px] font-bold text-zinc-400 dark:text-text-muted uppercase tracking-wider">
+                                    Progresso
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-16 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${(challenge.progress / challenge.target) * 100}%` }}
+                                            className="h-full bg-cyan-500"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                                        {challenge.progress}/{challenge.target}
+                                    </span>
+                                </div>
+                            </div>
                         )}
                     </motion.div>
                 ))}

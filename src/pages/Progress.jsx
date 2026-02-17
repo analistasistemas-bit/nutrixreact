@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { getExamHistory, getMeasurementHistory } from '../services/aiService';
 import BiomarkerDetailDrawer from '../components/BiomarkerDetailDrawer';
+import { useGamification } from '../hooks/useGamification';
 
 // --- Sub-componente: InsightDrawer (Painel Lateral Contextual) ---
 const InsightDrawer = ({ isOpen, onClose, insightData }) => {
@@ -740,6 +741,8 @@ const EnhancedAreaChart = ({ data, color = "#06b6d4", height = 120, targetRange 
 
 const Progress = () => {
     const [activeTab, setActiveTab] = useState('overview');
+    const { trackAction } = useGamification();
+
     const [timeFilter, setTimeFilter] = useState('30d');
     const [sortBy, setSortBy] = useState('alphabetical'); // 'alphabetical' | 'problems'
     const [searchTerm, setSearchTerm] = useState('');
@@ -1347,7 +1350,7 @@ const Progress = () => {
         if (insights.length < 3) {
             insights.push({
                 title: 'Consistência Nutricional',
-                description: 'Seus dados de biomarcadores mostram uma adesão sólida ao plano de micronutrientes.',
+                description: 'Aguardando mais dados de exames para analisar tendências de biomarcadores.',
                 icon: CheckCircle2,
                 theme: 'success',
                 priority: 5
@@ -1504,11 +1507,19 @@ const Progress = () => {
                                         </div>
 
                                         <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight tracking-tight">
-                                            Sua meta de gordura corporal está <span className="text-cyan-400">75% concluída</span>.
+                                            {measurements.length > 0 || exams.length > 0 ? (
+                                                <>Sua meta de saúde está <span className="text-cyan-400">em evolução</span>.</>
+                                            ) : (
+                                                <>Bem-vindo à sua <span className="text-cyan-400">Jornada de Saúde</span>.</>
+                                            )}
                                         </h1>
 
                                         <p className="text-lg text-zinc-400 leading-relaxed max-w-2xl">
-                                            A redução de 1.2% observada em massa gorda este mês é diretamente proporcional ao aumento da sua flexibilidade metabólica. Seus níveis de Vitamina D estão em zona de manutenção ideal.
+                                            {measurements.length > 0 || exams.length > 0 ? (
+                                                "Nossa IA está analisando seus últimos registros para identificar padrões e otimizar seu plano. Continue mantendo a consistência para resultados exponenciais."
+                                            ) : (
+                                                "Para começar a receber insights personalizados do seu Briefing Executivo, realize o upload do seu primeiro exame laboratorial ou registre suas medidas físicas."
+                                            )}
                                         </p>
 
                                         <div className="flex flex-wrap items-center gap-6 pt-4 border-t border-white/5">
@@ -1516,10 +1527,12 @@ const Progress = () => {
                                                 Visualizar Plano Otimizado
                                                 <ArrowRight className="w-4 h-4" />
                                             </button>
-                                            <div className="flex items-center gap-3 text-zinc-500 text-xs font-medium">
-                                                <CheckCircle2 className="w-4 h-4 text-cyan-500/50" />
-                                                Sincronizado com 12 biomarcadores
-                                            </div>
+                                            {(exams.length > 0 || measurements.length > 0) && (
+                                                <div className="flex items-center gap-3 text-zinc-500 text-xs font-medium">
+                                                    <CheckCircle2 className="w-4 h-4 text-cyan-500/50" />
+                                                    Sincronizado com {exams.length + measurements.length} fontes de dados
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

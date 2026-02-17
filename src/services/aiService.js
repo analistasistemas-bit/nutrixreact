@@ -1,6 +1,7 @@
 /**
  * Nutrixo AI Service Layer
  * Connects frontend to InsForge AI, Storage, and Database
+ * 🛡️ Todas as chamadas de dados de saúde passam por validação JWT
  */
 import insforge from '../lib/insforge';
 
@@ -24,8 +25,37 @@ function validateFile(file) {
     }
     return true;
 }
+
+/**
+ * 🛡️ Valida JWT e retorna o email do usuário autenticado.
+ * Deve ser chamada no início de toda operação que leia ou escreva dados de saúde.
+ */
+async function getAuthenticatedEmail() {
+    const { data, error } = await insforge.auth.getCurrentSession();
+
+    if (error || !data?.session) {
+        throw new Error('🔒 Sessão expirada. Faça login novamente.');
+    }
+
+    if (data.session.expiresAt && new Date() > new Date(data.session.expiresAt)) {
+        throw new Error('🔒 Sessão expirada. Faça login novamente.');
+    }
+
+    const email = data.session.user?.email;
+    if (!email) {
+        throw new Error('🔒 Usuário sem email identificado na sessão.');
+    }
+
+    return email;
+}
+
+// ============================================================
+// 🧪 EXAMS - Analyze blood test PDFs
+// ============================================================
 export async function analyzeExam(file) {
     validateFile(file);
+    const userEmail = await getAuthenticatedEmail();
+
     // 1. Upload PDF to storage
     const { data: uploadData, error: uploadError } = await insforge.storage
         .from('uploads')
@@ -42,10 +72,11 @@ export async function analyzeExam(file) {
 
     console.log('DEBUG: fileUrl (DB):', fileUrl);
 
-    // 2. Create pending record in DB
+    // 2. Create pending record in DB — associado ao user autenticado
     const { data: examRecord, error: dbError } = await insforge.database
         .from('nutrixo_exams')
         .insert([{
+            user_email: userEmail,
             file_name: file.name,
             file_url: fileUrl,
             file_key: uploadData.key,
@@ -110,7 +141,8 @@ Retorne APENAS o JSON, sem markdown, sem texto adicional.`
     await insforge.database
         .from('nutrixo_exams')
         .update({ analysis, status: 'completed' })
-        .eq('id', examRecord.id);
+        .eq('id', examRecord.id)
+        .eq('user_email', userEmail);
 
     return { id: examRecord.id, analysis };
 }
@@ -120,6 +152,8 @@ Retorne APENAS o JSON, sem markdown, sem texto adicional.`
 // ============================================================
 export async function analyzeMeasurements(file) {
     validateFile(file);
+    const userEmail = await getAuthenticatedEmail();
+
     const { data: uploadData, error: uploadError } = await insforge.storage
         .from('uploads')
         .uploadAuto(file);
@@ -133,11 +167,10 @@ export async function analyzeMeasurements(file) {
     // Convert file to base64 for AI analysis
     const fileBase64 = await fileToBase64(file);
 
-
-
     const { data: record, error: dbError } = await insforge.database
         .from('nutrixo_measurements')
         .insert([{
+            user_email: userEmail,
             file_name: file.name,
             file_url: fileUrl,
             file_key: uploadData.key,
@@ -206,7 +239,8 @@ REGRAS:
     await insforge.database
         .from('nutrixo_measurements')
         .update({ analysis, status: 'completed' })
-        .eq('id', record.id);
+        .eq('id', record.id)
+        .eq('user_email', userEmail);
 
     return { id: record.id, analysis };
 }
@@ -216,6 +250,8 @@ REGRAS:
 // ============================================================
 export async function analyzeNutritionPlan(file) {
     validateFile(file);
+    const userEmail = await getAuthenticatedEmail();
+
     const { data: uploadData, error: uploadError } = await insforge.storage
         .from('uploads')
         .uploadAuto(file);
@@ -232,6 +268,7 @@ export async function analyzeNutritionPlan(file) {
     const { data: record, error: dbError } = await insforge.database
         .from('nutrixo_plans')
         .insert([{
+            user_email: userEmail,
             file_name: file.name,
             file_url: fileUrl,
             file_key: uploadData.key,
@@ -297,7 +334,8 @@ Retorne APENAS o JSON.`
     await insforge.database
         .from('nutrixo_plans')
         .update({ analysis, status: 'completed' })
-        .eq('id', record.id);
+        .eq('id', record.id)
+        .eq('user_email', userEmail);
 
     return { id: record.id, analysis };
 }
@@ -307,6 +345,8 @@ Retorne APENAS o JSON.`
 // ============================================================
 export async function analyzeFoodPhoto(file, mealType) {
     validateFile(file);
+    const userEmail = await getAuthenticatedEmail();
+
     // Convert file to base64 for vision
     const base64 = await fileToBase64(file);
 
@@ -363,10 +403,11 @@ Retorne APENAS o JSON.`
         analysis = jsonMatch ? JSON.parse(jsonMatch[1]) : { raw: responseText };
     }
 
-    // Save meal to DB
+    // Save meal to DB — associado ao user autenticado
     const { data: meal } = await insforge.database
         .from('nutrixo_meals')
         .insert([{
+            user_email: userEmail,
             meal_type: mealType,
             input_method: 'photo',
             description: analysis.description || 'Refeição analisada por foto',
@@ -388,6 +429,8 @@ Retorne APENAS o JSON.`
 // 🎤 FOOD - Analyze voice/text description
 // ============================================================
 export async function analyzeFoodDescription(text, mealType) {
+    const userEmail = await getAuthenticatedEmail();
+
     const completion = await insforge.ai.chat.completions.create({
         model: AI_MODEL,
         messages: [
@@ -424,10 +467,11 @@ Retorne APENAS o JSON.`
         analysis = jsonMatch ? JSON.parse(jsonMatch[1]) : { raw: responseText };
     }
 
-    // Save meal to DB
+    // Save meal to DB — associado ao user autenticado
     const { data: meal } = await insforge.database
         .from('nutrixo_meals')
         .insert([{
+            user_email: userEmail,
             meal_type: mealType,
             input_method: 'voice',
             description: text,
@@ -474,13 +518,15 @@ IMPORTANTE: Sempre lembre que você não substitui um profissional de saúde.`
 }
 
 // ============================================================
-// 📊 DATA FETCHERS - Get historical data
+// 📊 DATA FETCHERS - Get historical data (com validação JWT)
 // ============================================================
 export async function getExamHistory() {
+    const userEmail = await getAuthenticatedEmail();
     const { data, error } = await insforge.database
         .from('nutrixo_exams')
         .select('*')
         .eq('status', 'completed')
+        .eq('user_email', userEmail)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -488,10 +534,12 @@ export async function getExamHistory() {
 }
 
 export async function getTodayMeals() {
+    const userEmail = await getAuthenticatedEmail();
     const today = new Date().toISOString().split('T')[0];
     const { data, error } = await insforge.database
         .from('nutrixo_meals')
         .select('*')
+        .eq('user_email', userEmail)
         .gte('created_at', today + 'T00:00:00')
         .order('created_at', { ascending: true });
 
@@ -500,10 +548,12 @@ export async function getTodayMeals() {
 }
 
 export async function getLatestMeasurements() {
+    const userEmail = await getAuthenticatedEmail();
     const { data, error } = await insforge.database
         .from('nutrixo_measurements')
         .select('*')
         .eq('status', 'completed')
+        .eq('user_email', userEmail)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -513,14 +563,105 @@ export async function getLatestMeasurements() {
 }
 
 export async function getMeasurementHistory() {
+    const userEmail = await getAuthenticatedEmail();
     const { data, error } = await insforge.database
         .from('nutrixo_measurements')
         .select('*')
         .eq('status', 'completed')
+        .eq('user_email', userEmail)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
     return data || [];
+}
+
+export async function getLatestNutritionPlan() {
+    try {
+        const userEmail = await getAuthenticatedEmail();
+        const { data, error } = await insforge.database
+            .from('nutrixo_plans')
+            .select('*')
+            .eq('status', 'completed')
+            .eq('user_email', userEmail)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116' || error.status === 406) return null;
+            throw error;
+        }
+        return data;
+    } catch (e) {
+        console.warn("Nenhum plano alimentar encontrado para este usuário.");
+        return null;
+    }
+}
+
+export async function generateHealthInsights() {
+    try {
+        const userEmail = await getAuthenticatedEmail();
+
+        // 1. Coletar dados mais recentes para contexto
+        const [history, measurement, plan] = await Promise.all([
+            getExamHistory(),
+            getLatestMeasurements(),
+            getLatestNutritionPlan()
+        ]);
+
+        const latestExam = history && history.length > 0 ? history[0] : null;
+
+        // Se não houver dados, não faz sentido chamar a IA
+        if (!latestExam && !measurement && !plan) {
+            return [];
+        }
+
+        // 2. Preparar contexto para a IA
+        const context = {
+            exam: latestExam?.analysis || null,
+            measurement: measurement?.analysis || null,
+            plan: plan?.analysis || null
+        };
+
+        // 3. Chamar IA para gerar insights
+        const completion = await insforge.ai.chat.completions.create({
+            model: AI_MODEL,
+            messages: [
+                {
+                    role: 'system',
+                    content: `Você é um especialista em saúde e longevidade. Analise os dados do usuário e gere exatamente 3 insights curtos e impactantes.
+                    JSON estruturado:
+                    {
+                      "insights": [
+                        {
+                          "id": "string único",
+                          "type": "positive" | "warning" | "tip",
+                          "title": "Título curto",
+                          "description": "Descrição de no máximo 150 caracteres"
+                        }
+                      ]
+                    }
+                    Priorize:
+                    - Alertas se houver exames alterados.
+                    - Elogios se o IMC ou gordura estiverem bons.
+                    - Dicas baseadas no plano alimentar vs medidas físicas.
+                    Retorne APENAS o JSON.`
+                },
+                {
+                    role: 'user',
+                    content: `Dados atuais: ${JSON.stringify(context)}. Gere os 3 melhores insights agora.`
+                }
+            ],
+            response_format: { type: 'json_object' }
+        });
+
+        const response = JSON.parse(completion.choices[0].message.content);
+        return response.insights || [];
+
+    } catch (error) {
+        console.error("Erro ao gerar insights por IA:", error);
+        return [];
+    }
 }
 
 // ============================================================

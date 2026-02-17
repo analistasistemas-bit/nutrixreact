@@ -12,7 +12,7 @@ const MainLayout = ({ user, onLogout }) => {
     const { notifications, unreadCount, markNotificationAsRead, markAllNotificationsAsRead } = useNotifications();
 
     return (
-        <GamificationProvider user={user}>
+        <GamificationProvider>
             <div className="min-h-screen relative">
                 <Header
                     user={user}

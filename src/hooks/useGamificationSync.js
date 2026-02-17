@@ -5,6 +5,9 @@ export const useGamificationSync = (totalXP, level, setTotalXP, userEmail = 'dem
     // Carregar dados iniciais do banco
     useEffect(() => {
         const loadProfile = async () => {
+            // Evitar chamadas desnecessárias/erros de RLS se não estiver logado
+            if (!userEmail || userEmail.includes('demo@nutrixo.com')) return;
+
             try {
                 const { data, error } = await insforge.database
                     .from('nutrixo_profiles')
@@ -38,6 +41,8 @@ export const useGamificationSync = (totalXP, level, setTotalXP, userEmail = 'dem
 
     // Salvar sempre que o XP mudar (Debounced opcionalmente, mas aqui faremos direto por enquanto)
     const persistXP = useCallback(async (newXP, newLevel) => {
+        if (!userEmail || userEmail.includes('demo@nutrixo.com')) return;
+
         try {
             const { error } = await insforge.database
                 .from('nutrixo_profiles')

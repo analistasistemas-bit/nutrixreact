@@ -132,11 +132,9 @@ export const CHALLENGE_POOL = [
     { id: 'log_3_meals', name: 'Tríade Saudável', description: 'Registre 3 refeições hoje', emoji: '🍽️', target: 3, type: 'meals' },
     { id: 'log_breakfast', name: 'Bom Dia!', description: 'Registre um café da manhã', emoji: '☕', target: 1, type: 'breakfast' },
     { id: 'drink_water', name: 'Hidratação Master', description: 'Beba 2 litros de água', emoji: '💧', target: 1, type: 'water' },
-    { id: 'check_progress', name: 'Auto-Reflexão', description: 'Visite a aba Progresso', emoji: '📈', target: 1, type: 'visit_progress' },
     { id: 'healthy_snack', name: 'Lanche Saudável', description: 'Registre um lanche saudável', emoji: '🍎', target: 1, type: 'snack' },
     { id: 'upload_exam', name: 'Saúde em Dia', description: 'Envie um exame para análise', emoji: '🧪', target: 1, type: 'exam' },
     { id: 'log_dinner', name: 'Jantar Completo', description: 'Registre seu jantar', emoji: '🌙', target: 1, type: 'dinner' },
-    { id: 'visit_nutrition', name: 'Planejamento', description: 'Visite o Plano Alimentar', emoji: '📋', target: 1, type: 'visit_nutrition' },
     { id: 'log_all_meals', name: 'Dia Completo', description: 'Registre refeições em todos os horários', emoji: '🏆', target: 4, type: 'meals' },
     { id: 'mindful_eating', name: 'Comer Consciente', description: 'Registre uma refeição usando foto', emoji: '📸', target: 1, type: 'photo_meal' },
 ];

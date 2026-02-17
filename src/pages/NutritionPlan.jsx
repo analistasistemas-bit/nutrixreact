@@ -5,11 +5,12 @@ import { analyzeNutritionPlan } from '../services/aiService';
 import AIAnalysisPage from '../components/common/AIAnalysisPage';
 
 const NutritionPlan = () => {
+    const { trackAction, addXP } = useGamification();
+
     const [uploadedFile, setUploadedFile] = useState(null);
     const [analysisResult, setAnalysisResult] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [error, setError] = useState(null);
-    const { addXP } = useGamification();
 
     const handleFileUpload = async (event) => {
         const file = event.target.files[0];

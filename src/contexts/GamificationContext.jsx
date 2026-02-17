@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { useAuth } from './AuthContext';
 import {
     calculateLevel,
     calculateLevelProgress,
@@ -12,17 +13,17 @@ import {
 import { GamificationContext } from './GamificationContextInstance';
 import { useGamificationSync } from '../hooks/useGamificationSync';
 
-export const GamificationProvider = ({ children, user }) => {
+export const GamificationProvider = ({ children }) => {
     // Core state
-    const [totalXP, setTotalXP] = useState(75); // Start with a bit of XP so user sees progress
-    const [currentStreak] = useState(2);
-    const [actionsToday, setActionsToday] = useState(1);
-    const [unlockedBadges, setUnlockedBadges] = useState(['first_meal', 'pet_evolved']);
+    const [totalXP, setTotalXP] = useState(0);
+    const [currentStreak] = useState(0);
+    const [actionsToday, setActionsToday] = useState(0);
+    const [unlockedBadges, setUnlockedBadges] = useState([]);
     const [dailyChallenges, setDailyChallenges] = useState(() => pickDailyChallenges(3));
 
     // Stats for achievement tracking
     const [stats, setStats] = useState({
-        mealsLogged: 5,
+        mealsLogged: 0,
         examsUploaded: 0,
         plansUploaded: 0,
         challengesCompleted: 0,
@@ -39,7 +40,8 @@ export const GamificationProvider = ({ children, user }) => {
     const petMood = getPetMood(currentStreak, actionsToday);
     const levelTitle = getLevelTitle(level);
 
-    // Sync layer - Re-ordered to avoid TDZ
+    // Sync layer — usa email do AuthContext (JWT validado)
+    const { user } = useAuth();
     const { persistXP } = useGamificationSync(totalXP, level, setTotalXP, user?.email || 'demo@nutrixo.com');
 
     // Show toast notification
@@ -76,6 +78,19 @@ export const GamificationProvider = ({ children, user }) => {
         });
     }, [unlockedBadges, showToast]);
 
+    // Refs to keep stable callback identities and avoid infinite loops
+    const totalXPRef = useRef(totalXP);
+    const statsRef = useRef(stats);
+    const dailyChallengesRef = useRef(dailyChallenges);
+    const currentStreakRef = useRef(currentStreak);
+
+    React.useEffect(() => { totalXPRef.current = totalXP; }, [totalXP]);
+    React.useEffect(() => { statsRef.current = stats; }, [stats]);
+    React.useEffect(() => { dailyChallengesRef.current = dailyChallenges; }, [dailyChallenges]);
+
+    // Track recently processed actions to avoid double-processing in the same render cycle
+    const lastTrackedRef = useRef({});
+
     // Add XP and check for level ups and achievements
     const addXP = useCallback((rewardKey) => {
         const reward = XP_REWARDS[rewardKey];
@@ -83,11 +98,12 @@ export const GamificationProvider = ({ children, user }) => {
 
         let xpGain = reward.xp;
         if (rewardKey === 'DAILY_STREAK') {
-            xpGain = reward.xp * currentStreak;
+            xpGain = reward.xp * currentStreakRef.current;
         }
 
-        const oldLevel = calculateLevel(totalXP);
-        const newTotalXP = totalXP + xpGain;
+        const currentXP = totalXPRef.current;
+        const oldLevel = calculateLevel(currentXP);
+        const newTotalXP = currentXP + xpGain;
         const newLevel = calculateLevel(newTotalXP);
 
         setTotalXP(newTotalXP);
@@ -122,27 +138,82 @@ export const GamificationProvider = ({ children, user }) => {
         }
 
         // Update stats
-        const newStats = { ...stats, level: newLevel };
-        if (rewardKey === 'LOG_MEAL') newStats.mealsLogged = (stats.mealsLogged || 0) + 1;
-        if (rewardKey === 'UPLOAD_EXAM') newStats.examsUploaded = (stats.examsUploaded || 0) + 1;
-        if (rewardKey === 'UPLOAD_PLAN') newStats.plansUploaded = (stats.plansUploaded || 0) + 1;
-        if (rewardKey === 'COMPLETE_CHALLENGE') newStats.challengesCompleted = (stats.challengesCompleted || 0) + 1;
-        setStats(newStats);
+        setStats(prev => {
+            const newStats = { ...prev, level: newLevel };
+            if (rewardKey === 'LOG_MEAL') newStats.mealsLogged = (prev.mealsLogged || 0) + 1;
+            if (rewardKey === 'UPLOAD_EXAM') newStats.examsUploaded = (prev.examsUploaded || 0) + 1;
+            if (rewardKey === 'UPLOAD_PLAN') newStats.plansUploaded = (prev.plansUploaded || 0) + 1;
+            if (rewardKey === 'COMPLETE_CHALLENGE') newStats.challengesCompleted = (prev.challengesCompleted || 0) + 1;
 
-        // Check for new achievements
-        checkAchievements({ ...newStats, currentStreak, level: newLevel });
-    }, [totalXP, currentStreak, stats, showToast, checkAchievements]);
+            // Check for new achievements inline to ensure they use latest stats
+            checkAchievements({ ...newStats, currentStreak: currentStreakRef.current, level: newLevel });
+            return newStats;
+        });
+    }, [persistXP, showToast, checkAchievements]);
 
-    // Complete a daily challenge
+    const addXPRef = useRef(addXP);
+    React.useEffect(() => { addXPRef.current = addXP; }, [addXP]);
+
+    // Track user actions for challenges
+    const trackAction = useCallback((actionType, amount = 1) => {
+        // Prevent multiple identical tracks in a very short window (e.g., re-renders or double mounts)
+        const now = Date.now();
+        if (lastTrackedRef.current[actionType] && now - lastTrackedRef.current[actionType] < 1000) {
+            return;
+        }
+        lastTrackedRef.current[actionType] = now;
+
+        setDailyChallenges(prev => {
+            let challengeCompleted = false;
+            const updated = prev.map(challenge => {
+                if (!challenge.completed && challenge.type === actionType) {
+                    const newProgress = Math.min(challenge.progress + amount, challenge.target);
+                    const isNowCompleted = newProgress >= challenge.target;
+
+                    if (isNowCompleted && !challenge.completed) {
+                        challengeCompleted = true;
+                        return { ...challenge, progress: newProgress, completed: true };
+                    }
+                    return { ...challenge, progress: newProgress };
+                }
+                return challenge;
+            });
+
+            if (challengeCompleted) {
+                // XP is added with a small delay to separate from state update
+                setTimeout(() => addXPRef.current('COMPLETE_CHALLENGE'), 100);
+
+                // Replace challenge after a longer delay
+                setTimeout(() => {
+                    setDailyChallenges(current => {
+                        const remaining = current.filter(c => !c.completed || c.type !== actionType);
+                        if (remaining.length < 3) {
+                            const usedIds = new Set(current.map(c => c.id));
+                            const available = CHALLENGE_POOL.filter(c => !usedIds.has(c.id));
+                            if (available.length > 0) {
+                                const next = available[Math.floor(Math.random() * available.length)];
+                                return [...remaining, { ...next, progress: 0, completed: false }];
+                            }
+                        }
+                        return current;
+                    });
+                }, 4000);
+            }
+
+            return updated;
+        });
+    }, []);
+
+    // Complete a daily challenge (legacy/manual - keeping for compatibility)
     const completeChallenge = useCallback((challengeId) => {
         setDailyChallenges(prev => prev.map(c => {
             if (c.id === challengeId && !c.completed) {
+                addXPRef.current('COMPLETE_CHALLENGE');
                 return { ...c, progress: c.target, completed: true };
             }
             return c;
         }));
-        addXP('COMPLETE_CHALLENGE');
-    }, [addXP]);
+    }, []);
 
     // Dismiss level up modal
     const dismissLevelUp = useCallback(() => {
@@ -167,6 +238,7 @@ export const GamificationProvider = ({ children, user }) => {
         // Actions
         addXP,
         completeChallenge,
+        trackAction,
         dismissToast,
         dismissLevelUp,
     };

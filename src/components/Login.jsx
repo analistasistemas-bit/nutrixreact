@@ -12,18 +12,29 @@ const loginSchema = z.object({
 
 const Login = ({ onLogin }) => {
     const [isSignUp, setIsSignUp] = useState(false);
-    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState({});
     const [isSuccess, setIsSuccess] = useState(false);
+    const [verificationSent, setVerificationSent] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [verifying, setVerifying] = useState(false);
     const [isDev] = useState(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    const handleLoginSuccess = (userData, token) => {
+        setIsSuccess(true);
+        setTimeout(() => {
+            onLogin(userData, token);
+        }, 800);
+    };
 
     const checkValidity = () => {
         const result = loginSchema.safeParse({ email, password });
+        if (isSignUp && name.length < 2) return false;
         return result.success;
     };
 
@@ -44,53 +55,46 @@ const Login = ({ onLogin }) => {
             return;
         }
 
-        setIsLoading(true);
+        if (isSignUp && name.trim().length < 2) {
+            setFieldErrors({ ...fieldErrors, name: 'Nome deve ter pelo menos 2 caracteres.' });
+            return;
+        }
 
-        const handleLoginSuccess = (userData) => {
-            setIsSuccess(true);
-            setTimeout(() => {
-                onLogin(userData); // Pass user data back
-            }, 800);
-        };
+        setIsLoading(true);
 
         const attemptAuth = async () => {
             try {
                 if (isSignUp) {
-                    const { data, error: signUpError } = await insforge.auth.signUp({
+                    // Sign Up Flow
+                    const { data, error } = await insforge.auth.signUp({
                         email,
                         password,
-                        name: name || 'Sentinel',
+                        name,
                     });
 
-                    if (signUpError) {
-                        setError(signUpError.message || 'Erro ao criar conta.');
+                    if (error) {
+                        setError(error.message || 'Erro ao criar conta.');
                         setIsLoading(false);
                         return;
                     }
 
-                    if (data) {
-                        handleLoginSuccess(data.user);
+                    if (data?.requireEmailVerification) {
+                        setVerificationSent(true);
+                        setIsLoading(false);
+                        return;
                     }
+
+                    if (data?.accessToken) {
+                        handleLoginSuccess(data.user, data.accessToken);
+                    } else {
+                        // Caso onde o signUp não retorna sessão imediata mas não requer verificação (raro)
+                        // Tentamos login automático
+                        await attemptLoginOnly();
+                    }
+
                 } else {
-                    const { data, error: signInError } = await insforge.auth.signInWithPassword({
-                        email,
-                        password,
-                    });
-
-                    if (signInError) {
-                        if (signInError.error === 'INVALID_CREDENTIALS' && isDev) {
-                            console.warn('Fallback DEV: Credenciais inválidas no Insforge');
-                            handleLoginSuccess({ email, name: 'Diego (Dev)' });
-                            return;
-                        }
-                        setError(signInError.message || 'E-mail ou senha incorretos.');
-                        setIsLoading(false);
-                        return;
-                    }
-
-                    if (data) {
-                        handleLoginSuccess(data.user);
-                    }
+                    // Sign In Flow
+                    await attemptLoginOnly();
                 }
             } catch (err) {
                 setError('Falha na conexão com o servidor.');
@@ -98,7 +102,36 @@ const Login = ({ onLogin }) => {
             }
         };
 
+        const attemptLoginOnly = async () => {
+            const { data, error } = await insforge.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                if (error.error === 'INVALID_CREDENTIALS' && isDev) {
+                    console.warn('DEV: Bypass login simulado');
+                    handleLoginSuccess({ email, name: 'Diego (Dev)' }, null);
+                    return;
+                }
+                setError(error.message || 'E-mail ou senha incorretos.');
+                setIsLoading(false);
+                return;
+            }
+
+            if (data) {
+                handleLoginSuccess(data.user, data.accessToken);
+            }
+        };
+
         attemptAuth();
+    };
+
+    const toggleMode = () => {
+        setIsSignUp(!isSignUp);
+        setError('');
+        setFieldErrors({});
+        setVerificationSent(false);
     };
 
     React.useEffect(() => {
@@ -109,30 +142,102 @@ const Login = ({ onLogin }) => {
         if (urlEmail) setEmail(urlEmail);
         if (urlPass) setPassword(urlPass);
 
-        // Auto-submit if both are present and valid
-        if (urlEmail && urlPass) {
+        if (urlEmail && urlPass && !isSignUp) {
             const result = loginSchema.safeParse({ email: urlEmail, password: urlPass });
             if (result.success) {
                 setTimeout(() => {
-                    document.getElementById('login-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-                    handleSubmit({ preventDefault: () => { } });
+                    document.getElementById('login-submit')?.click();
                 }, 500);
             }
         }
-    }, [handleSubmit]); // Added dependency
+    }, [isSignUp]);
 
-    const handleQuickLogin = () => {
-        setEmail('test@test.com');
-        setPassword('123456');
-        setTimeout(() => {
-            handleSubmit({ preventDefault: () => { } });
-        }, 100);
+
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        setVerifying(true);
+        setError('');
+
+        try {
+            const { data, error } = await insforge.auth.verifyEmail({
+                email,
+                otp: otp,
+            });
+
+            if (error) throw error;
+
+            if (data?.accessToken) {
+                handleLoginSuccess(data.user, data.accessToken);
+            }
+        } catch (err) {
+            setError(err.message || 'Código inválido ou expirado.');
+            setVerifying(false);
+        }
     };
+
+    if (verificationSent) {
+        return (
+            <div className="min-h-screen w-full bg-black flex items-center justify-center font-sans">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-zinc-900/60 backdrop-blur-xl rounded-3xl border border-zinc-800 p-10 max-w-md w-full text-center"
+                >
+                    <div className="w-16 h-16 bg-cyan-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Mail className="w-8 h-8 text-cyan-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-2">Verifique seu e-mail</h2>
+                    <p className="text-zinc-400 mb-6 text-sm">
+                        Enviamos um código de confirmação para <strong className="text-white">{email}</strong>.
+                        Digite o código abaixo para ativar sua conta.
+                    </p>
+
+                    <form onSubmit={handleVerifyOtp} className="space-y-4">
+                        <input
+                            type="text"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                            placeholder="000000"
+                            className="block w-full text-center py-4 bg-black/40 border border-zinc-700 rounded-xl text-white text-2xl tracking-[0.5em] font-mono focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all outline-none placeholder:tracking-normal placeholder:text-zinc-700"
+                            autoFocus
+                            required
+                        />
+
+                        {error && (
+                            <p className="text-red-400 text-xs">{error}</p>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={otp.length < 6 || verifying}
+                            className={`w-full py-3 rounded-xl font-bold text-white transition-all ${otp.length === 6 && !verifying
+                                ? 'bg-cyan-600 hover:bg-cyan-500 shadow-lg shadow-cyan-900/20'
+                                : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                                }`}
+                        >
+                            {verifying ? 'Verificando...' : 'Verificar Código'}
+                        </button>
+                    </form>
+
+                    <button
+                        onClick={() => {
+                            setVerificationSent(false);
+                            setOtp('');
+                            setError('');
+                        }}
+                        className="mt-6 text-zinc-500 hover:text-zinc-300 text-xs transition-colors"
+                    >
+                        Voltar e corrigir e-mail
+                    </button>
+                </motion.div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen w-full bg-black relative overflow-hidden flex items-center justify-center font-sans">
 
-            {/* Dynamic Background Elements */}
             <div className="absolute inset-0 z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-500/20 rounded-full blur-[120px] animate-pulse" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse delay-1000" />
@@ -146,113 +251,100 @@ const Login = ({ onLogin }) => {
             >
                 <div className="bg-zinc-900/60 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-zinc-800/50 p-8 md:p-10">
 
-                    {/* Header */}
-                    <div className="text-center mb-10">
+                    <div className="text-center mb-8">
                         <motion.div
                             initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                            className="w-32 h-32 bg-transparent flex items-center justify-center mx-auto mb-2"
+                            className="w-24 h-24 bg-transparent flex items-center justify-center mx-auto mb-4"
                         >
-                            {/* If real logo is available use it, otherwise use icon */}
-                            <img src={NutrixoIcon} alt="Nutrixo" className="w-full h-full object-contain rounded-[2rem] shadow-lg shadow-cyan-500/20" />
+                            <img src={NutrixoIcon} alt="Nutrixo" className="w-full h-full object-contain rounded-[1.5rem] shadow-lg shadow-cyan-500/20" />
                         </motion.div>
 
                         <motion.h1
-                            initial={{ y: 10, opacity: 0 }}
+                            key={isSignUp ? 'signup' : 'signin'}
+                            initial={{ y: 5, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.3 }}
                             className="text-2xl font-bold text-white mb-2"
                         >
-                            {isSignUp ? 'Criar Conta Sentinel' : 'Bem-vindo de volta'}
+                            {isSignUp ? 'Crie sua conta' : 'Bem-vindo de volta'}
                         </motion.h1>
-                        <motion.p
-                            initial={{ y: 10, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.4 }}
-                            className="text-zinc-400 text-sm"
-                        >
-                            {isSignUp ? 'Junte-se à elite da saúde e bem-estar' : 'Acompanhe sua saúde de forma inteligente'}
-                        </motion.p>
+                        <p className="text-zinc-400 text-sm">
+                            {isSignUp ? 'Comece sua jornada de saúde hoje' : 'Acompanhe sua saúde de forma inteligente'}
+                        </p>
                     </div>
 
-                    {/* Form */}
                     <form id="login-form" onSubmit={handleSubmit} className="space-y-5">
 
-                        {/* Name Field (Sign Up Only) */}
                         {isSignUp && (
                             <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                overflow="hidden"
                                 className="space-y-2"
                             >
-                                <label className="text-sm font-semibold text-zinc-300 ml-1" htmlFor="name">
-                                    Nome Completo
-                                </label>
+                                <label className="text-sm font-semibold text-zinc-300 ml-1">Nome</label>
                                 <div className="relative group">
                                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                         <Activity className="h-5 w-5 text-zinc-500 group-focus-within:text-cyan-400 transition-colors" />
                                     </div>
                                     <input
-                                        id="login-name"
                                         type="text"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="block w-full pl-11 pr-4 py-3 bg-black/40 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all duration-200 outline-none sm:text-sm"
-                                        placeholder="Como devemos te chamar?"
+                                        className="block w-full pl-11 pr-4 py-3.5 bg-black/40 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all outline-none sm:text-sm"
+                                        placeholder="Seu nome"
                                         required={isSignUp}
                                     />
                                 </div>
+                                {fieldErrors.name && (
+                                    <p className="text-red-400 text-[10px] mt-1 ml-1 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" /> {fieldErrors.name}
+                                    </p>
+                                )}
                             </motion.div>
                         )}
 
-                        {/* Email Field */}
                         <div className="space-y-2">
-                            <label className="text-sm font-semibold text-zinc-300 ml-1" htmlFor="email">
-                                E-mail
-                            </label>
+                            <label className="text-sm font-semibold text-zinc-300 ml-1">E-mail</label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <Mail className="h-5 w-5 text-zinc-500 group-focus-within:text-cyan-400 transition-colors" />
                                 </div>
                                 <input
-                                    id="login-email"
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="block w-full pl-11 pr-4 py-3.5 bg-black/40 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all duration-200 outline-none sm:text-sm"
+                                    className="block w-full pl-11 pr-4 py-3.5 bg-black/40 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all outline-none sm:text-sm"
                                     placeholder="seu@email.com"
                                     required
                                 />
                             </div>
                             {fieldErrors.email && (
                                 <p className="text-red-400 text-[10px] mt-1 ml-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {fieldErrors.email}
+                                    <AlertCircle className="w-3 h-3" /> {fieldErrors.email}
                                 </p>
                             )}
                         </div>
 
-                        {/* Password Field */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between ml-1">
-                                <label className="text-sm font-semibold text-zinc-300" htmlFor="password">
-                                    Senha
-                                </label>
-                                <a href="#" className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
-                                    Esqueceu a senha?
-                                </a>
+                                <label className="text-sm font-semibold text-zinc-300">Senha</label>
+                                {!isSignUp && (
+                                    <a href="#" className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
+                                        Esqueceu a senha?
+                                    </a>
+                                )}
                             </div>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                     <Lock className="h-5 w-5 text-zinc-500 group-focus-within:text-cyan-400 transition-colors" />
                                 </div>
                                 <input
-                                    id="login-password"
                                     type={showPassword ? "text" : "password"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full pl-11 pr-12 py-3.5 bg-black/40 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all duration-200 outline-none sm:text-sm"
+                                    className="block w-full pl-11 pr-12 py-3.5 bg-black/40 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all outline-none sm:text-sm"
                                     placeholder="••••••••"
                                     required
                                 />
@@ -270,13 +362,11 @@ const Login = ({ onLogin }) => {
                             </div>
                             {fieldErrors.password && (
                                 <p className="text-red-400 text-[10px] mt-1 ml-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {fieldErrors.password}
+                                    <AlertCircle className="w-3 h-3" /> {fieldErrors.password}
                                 </p>
                             )}
                         </div>
 
-                        {/* Error Message */}
                         {error && (
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
@@ -288,7 +378,6 @@ const Login = ({ onLogin }) => {
                             </motion.div>
                         )}
 
-                        {/* Submit Button */}
                         <motion.button
                             id="login-submit"
                             whileHover={{ scale: isValid && !isLoading ? 1.02 : 1 }}
@@ -314,37 +403,22 @@ const Login = ({ onLogin }) => {
                             )}
                         </motion.button>
 
-                        {/* Toggle Link */}
                         <div className="text-center pt-2 space-y-4">
                             <p className="text-sm text-zinc-500">
-                                {isSignUp ? 'Já tem uma conta?' : 'Ainda não tem uma conta?'} {' '}
+                                {isSignUp ? 'Já tem uma conta? ' : 'Ainda não tem uma conta? '}
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setIsSignUp(!isSignUp);
-                                        setError('');
-                                    }}
-                                    className="font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+                                    onClick={toggleMode}
+                                    className="font-semibold text-cyan-400 hover:text-cyan-300 transition-colors bg-transparent border-none cursor-pointer"
                                 >
-                                    {isSignUp ? 'Fazer login' : 'Criar conta'}
+                                    {isSignUp ? 'Fazer Login' : 'Criar conta'}
                                 </button>
                             </p>
-
-                            {isDev && (
-                                <button
-                                    type="button"
-                                    onClick={handleQuickLogin}
-                                    className="text-[10px] font-bold text-zinc-600 hover:text-zinc-400 uppercase tracking-widest transition-colors border border-zinc-800 rounded-full px-4 py-1.5 hover:bg-zinc-800"
-                                >
-                                    ⚡ Quick Login (Dev Only)
-                                </button>
-                            )}
                         </div>
 
                     </form>
                 </div>
 
-                {/* Footer / Trust indicators */}
                 <div className="mt-8 flex justify-center space-x-6">
                     <div className="flex items-center space-x-1.5 text-zinc-600">
                         <ShieldCheck className="w-4 h-4" />

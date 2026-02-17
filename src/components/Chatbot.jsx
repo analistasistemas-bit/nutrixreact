@@ -102,15 +102,22 @@ const Chatbot = () => {
         <div className="fixed bottom-24 right-4 z-50 lg:bottom-4 lg:right-4">
             <AnimatePresence>
                 {!showChatbot ? (
-                    <motion.button
-                        key="chatbot-button"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => setShowChatbot(true)}
-                        className="w-14 h-14 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full shadow-lg flex items-center justify-center text-white"
-                    >
-                        <Bot className="w-6 h-6" />
-                    </motion.button>
+                    <div className="relative"> {/* Wrapper relativo para conter o pulso absoluto */}
+                        <div className="absolute inset-0 rounded-full animate-pulse-ring z-0"></div> {/* O "Ovo" Pulsante */}
+                        <motion.button
+                            key="chatbot-button"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => setShowChatbot(true)}
+                            className="relative z-10 w-14 h-14 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full shadow-lg flex items-center justify-center text-white overflow-hidden p-0 border-2 border-white/20"
+                        >
+                            <img
+                                src="/chatbot-icon.png"
+                                alt="Nutrixo AI"
+                                className="w-full h-full object-cover"
+                            />
+                        </motion.button>
+                    </div>
                 ) : (
                     <motion.div
                         key="chatbot-panel"
@@ -123,8 +130,12 @@ const Chatbot = () => {
                         <div className="bg-gradient-to-r from-cyan-500 to-blue-600 rounded-t-2xl p-4 text-white">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
-                                    <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                                        <Bot className="w-4 h-4" />
+                                    <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center overflow-hidden border border-white/30">
+                                        <img
+                                            src="/chatbot-icon.png"
+                                            alt="Bot"
+                                            className="w-full h-full object-cover"
+                                        />
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-sm">Assistente Nutrixo</h3>

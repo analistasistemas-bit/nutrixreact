@@ -2,23 +2,29 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { TrendingUp, ChevronDown, Upload, Camera, MessageCircle, FileText, Shield, Lock, Sparkles, HeartPulse, Info, AlertTriangle } from 'lucide-react';
-import { healthMetrics } from '../data/mocks/mockMetrics';
-import { recentInsights } from '../data/mocks/mockInsights';
-import { initialMacroNutrients } from '../data/mocks/mockMetrics';
 import MacroNutrientsCard from '../components/MacroNutrientsCard';
 import XPBar from '../components/gamification/XPBar';
 import StreakCounter from '../components/gamification/StreakCounter';
 import PetWidget from '../components/gamification/PetWidget';
 import DailyChallenges from '../components/gamification/DailyChallenges';
-import { getExamHistory } from '../services/aiService';
+import { getExamHistory, getTodayMeals, getLatestNutritionPlan, generateHealthInsights } from '../services/aiService';
+
+const INITIAL_MACROS = {
+    protein: { consumed: 0, goal: 0, unit: 'g' },
+    carbs: { consumed: 0, goal: 0, unit: 'g' },
+    fats: { consumed: 0, goal: 0, unit: 'g' }
+};
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const [macroNutrients] = useState(initialMacroNutrients);
-    const [dailyCalories] = useState(2000);
-    const [consumedCalories] = useState(850);
+    const [macroNutrients, setMacroNutrients] = useState(INITIAL_MACROS);
+    const [dailyCalories, setDailyCalories] = useState(0);
+    const [consumedCalories, setConsumedCalories] = useState(0);
     const [healthMetrics, setHealthMetrics] = useState([]);
     const [isLoadingHealth, setIsLoadingHealth] = useState(true);
+    const [isLoadingNutrition, setIsLoadingNutrition] = useState(true);
+    const [isLoadingInsights, setIsLoadingInsights] = useState(true);
+    const [insights, setInsights] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
     React.useEffect(() => {
@@ -26,7 +32,6 @@ const Dashboard = () => {
             try {
                 const history = await getExamHistory();
                 if (history && history.length > 0) {
-                    // Pegar o exame mais recente
                     const latestExam = history[0];
                     const biomarkers = latestExam.analysis?.biomarkers || [];
 
@@ -51,7 +56,65 @@ const Dashboard = () => {
             }
         };
 
+        const fetchNutritionData = async () => {
+            try {
+                const [meals, plan] = await Promise.all([
+                    getTodayMeals(),
+                    getLatestNutritionPlan()
+                ]);
+
+                // 1. Calcular Consumo
+                let totalCals = 0;
+                let totalProt = 0;
+                let totalCarb = 0;
+                let totalFat = 0;
+
+                meals.forEach(meal => {
+                    totalCals += (meal.calories || 0);
+                    totalProt += (meal.protein || 0);
+                    totalCarb += (meal.carbs || 0);
+                    totalFat += (meal.fats || 0);
+                });
+
+                setConsumedCalories(Math.round(totalCals));
+
+                // 2. Extrair Metas do Plano
+                const planMacros = plan?.analysis?.dailyMacros || {};
+                const goals = {
+                    calories: planMacros.calories || 0,
+                    protein: planMacros.protein || 0,
+                    carbs: planMacros.carbs || 0,
+                    fats: planMacros.fats || 0
+                };
+
+                setDailyCalories(goals.calories);
+                setMacroNutrients({
+                    protein: { consumed: Math.round(totalProt), goal: goals.protein, unit: 'g' },
+                    carbs: { consumed: Math.round(totalCarb), goal: goals.carbs, unit: 'g' },
+                    fats: { consumed: Math.round(totalFat), goal: goals.fats, unit: 'g' }
+                });
+
+            } catch (error) {
+                console.error("Erro ao carregar dados de nutrição:", error);
+            } finally {
+                setIsLoadingNutrition(false);
+            }
+        };
+
+        const fetchInsights = async () => {
+            try {
+                const data = await generateHealthInsights();
+                setInsights(data);
+            } catch (error) {
+                console.error("Erro ao carregar insights:", error);
+            } finally {
+                setIsLoadingInsights(false);
+            }
+        };
+
         fetchHealthData();
+        fetchNutritionData();
+        fetchInsights();
     }, []);
 
     return (
@@ -177,36 +240,51 @@ const Dashboard = () => {
                     <p className="text-zinc-600 dark:text-text-secondary text-sm mb-4">Recomendações baseadas em seus dados</p>
 
                     <div className="space-y-3">
-                        {recentInsights.map((insight, index) => (
-                            <motion.div
-                                key={insight.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                className={`p-4 rounded-xl border ${insight.type === 'positive'
-                                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50'
-                                    : insight.type === 'tip'
-                                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50'
-                                        : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800/50'
-                                    }`}
-                            >
-                                <div className="flex items-start space-x-3">
-                                    {insight.type === 'positive' && (
-                                        <HeartPulse className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
-                                    )}
-                                    {insight.type === 'tip' && (
-                                        <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                                    )}
-                                    {insight.type === 'warning' && (
-                                        <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                                    )}
-                                    <div>
-                                        <h3 className="font-bold text-zinc-900 dark:text-text-primary">{insight.title}</h3>
-                                        <p className="text-zinc-600 dark:text-text-secondary text-sm">{insight.description}</p>
+                        {isLoadingInsights ? (
+                            <div className="flex flex-col items-center justify-center py-10 space-y-3 border border-dashed border-zinc-200 dark:border-border-subtle rounded-xl bg-zinc-50 dark:bg-bg-secondary">
+                                <div className="w-6 h-6 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
+                                <p className="text-zinc-500 dark:text-text-muted text-xs">IA gerando insights personalizados...</p>
+                            </div>
+                        ) : insights.length > 0 ? (
+                            insights.map((insight, index) => (
+                                <motion.div
+                                    key={insight.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className={`p-4 rounded-xl border ${insight.type === 'positive'
+                                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50'
+                                        : insight.type === 'tip'
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50'
+                                            : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800/50'
+                                        }`}
+                                >
+                                    <div className="flex items-start space-x-3">
+                                        {insight.type === 'positive' && (
+                                            <HeartPulse className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+                                        )}
+                                        {insight.type === 'tip' && (
+                                            <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                                        )}
+                                        {insight.type === 'warning' && (
+                                            <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                                        )}
+                                        <div>
+                                            <h3 className="font-bold text-zinc-900 dark:text-text-primary text-sm">{insight.title}</h3>
+                                            <p className="text-zinc-600 dark:text-text-secondary text-xs">{insight.description}</p>
+                                        </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                        ))}
+                                </motion.div>
+                            ))
+                        ) : (
+                            <div className="text-center py-8 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-dashed border-zinc-200 dark:border-border-subtle">
+                                <Sparkles className="w-8 h-8 text-cyan-500/50 mx-auto mb-3" />
+                                <h3 className="font-bold text-zinc-900 dark:text-text-primary text-sm mb-1">Aguardando Seus Dados</h3>
+                                <p className="text-zinc-500 dark:text-text-muted text-xs px-6">
+                                    Nossa IA Nutrixo analisará seus exames e planos para gerar insights personalizados aqui. 🤖✨
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </motion.div>
             </div>

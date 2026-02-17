@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Flame, Droplet, Circle, ChevronDown } from 'lucide-react';
 
 const NutrientCard = ({ icon: Icon, title, consumed, goal, unit, colorClass, gradientClass, glowColor, compact }) => {
-    const percentage = Math.min((consumed / (goal || consumed)) * 100, 100);
+    const percentage = goal > 0 ? Math.min((consumed / goal) * 100, 100) : (consumed > 0 ? 100 : 0);
 
     return (
         <motion.div
@@ -39,7 +39,7 @@ const NutrientCard = ({ icon: Icon, title, consumed, goal, unit, colorClass, gra
                     ></motion.div>
                 </div>
             </div>
-            {!compact && goal && (
+            {!compact && goal > 0 && (
                 <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-text-muted">
                     {Math.max(goal - consumed, 0)}{unit || 'g'} restantes
                 </div>

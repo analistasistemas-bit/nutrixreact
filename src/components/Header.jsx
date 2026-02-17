@@ -18,6 +18,10 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
     const [showMobileNotifications, setShowMobileNotifications] = useState(false);
     const { petStage, level } = useGamification();
 
+    // Extração segura de dados do usuário
+    const displayName = user?.user_metadata?.name || user?.name || user?.email?.split('@')[0] || 'Usuário';
+    const displayAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.avatar || user?.avatar;
+
     const activeTab = tabs.find(t =>
         location.pathname === t.path ||
         (t.path !== '/' && location.pathname.startsWith(t.path))
@@ -88,14 +92,14 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                         {unreadCount > 0 && (
                                             <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
                                         )}
-                                        {user.avatar ? (
-                                            <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                                        {displayAvatar ? (
+                                            <img src={displayAvatar} alt={displayName} className="w-full h-full rounded-full object-cover" />
                                         ) : (
-                                            user.name.charAt(0)
+                                            displayName.charAt(0).toUpperCase()
                                         )}
                                     </div>
                                     <div className="text-left hidden xl:block">
-                                        <p className="text-xs font-bold text-zinc-900 dark:text-white leading-none">{user.name}</p>
+                                        <p className="text-xs font-bold text-zinc-900 dark:text-white leading-none">{displayName}</p>
                                     </div>
                                     <ChevronDown className={`w-4 h-4 text-zinc-400 dark:text-zinc-300 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
                                 </button>
@@ -117,10 +121,10 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                                 <div className="p-5 border-b border-zinc-50 dark:border-border-subtle bg-gradient-to-br from-zinc-50 to-white dark:from-bg-secondary dark:to-bg-tertiary">
                                                     <div className="flex items-center space-x-3">
                                                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-                                                            {user.name.charAt(0)}
+                                                            {displayName.charAt(0).toUpperCase()}
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-bold text-gray-900 dark:text-text-primary">{user.name}</p>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-text-primary">{displayName}</p>
                                                             <div className="flex items-center gap-2">
                                                                 <div className="flex items-center space-x-1 bg-white dark:bg-zinc-800 border border-cyan-100 dark:border-cyan-900/50 rounded-full px-1.5 py-0.5">
                                                                     <span className="text-xs">{petStage.emoji}</span>
@@ -262,7 +266,7 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                 onClick={() => setShowMobileProfile(true)}
                                 className="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white active:scale-95 transition-transform"
                             >
-                                {user.avatar ? <img src={user.avatar} className="w-full h-full rounded-full" /> : user.name.charAt(0)}
+                                {displayAvatar ? <img src={displayAvatar} className="w-full h-full rounded-full" /> : displayName.charAt(0).toUpperCase()}
                             </button>
 
                             <button
@@ -405,10 +409,10 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                             <div className="p-6">
                                 <div className="flex items-center space-x-4 mb-8 bg-gray-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
                                     <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg ring-4 ring-white dark:ring-slate-900">
-                                        {user.avatar ? <img src={user.avatar} className="w-full h-full rounded-full" /> : user.name.charAt(0)}
+                                        {displayAvatar ? <img src={displayAvatar} className="w-full h-full rounded-full" /> : displayName.charAt(0).toUpperCase()}
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{user.name}</h3>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{displayName}</h3>
                                         <p className="text-sm text-gray-500 dark:text-slate-400">{user.email}</p>
                                         <div className="mt-1 inline-flex items-center bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
                                             Membro Pro

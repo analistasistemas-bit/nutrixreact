@@ -17,16 +17,16 @@ Este arquivo serve como o controle de execução para as melhorias do NutixoApp.
 
 ---
 
-## 🏗️ [Épico 2] Infraestrutura & Dados Reais (Integrado) [/]
+## 🏗️ [Épico 2] Infraestrutura & Dados Reais (Integrado) [CONCLUÍDO] ✅
 - [x] **Setup do Insforge DB**
   - [x] Criar tabela `profiles` com colunas `xp`, `level` e `avatar_id`
   - [x] Criar tabela `health_history` para armazenar resultados de exames
 - [x] **Camada de Sincronização (Sync Layer)**
   - [x] Implementar Hook `useSync` no `GamificationContext`
   - [x] Criar lógica para persistir dados locais -> banco quando online
-- [/] **Segurança de Dados** [/]
+- [x] **Segurança de Dados** ✅
   - [x] Implementar fluxo de login real com o SDK do Insforge
-  - [ ] Adicionar validação JWT nas chamadas de dados de saúde
+  - [x] Adicionar validação JWT nas chamadas de dados de saúde
 
 ---
 
