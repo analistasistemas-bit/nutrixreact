@@ -22,7 +22,7 @@ const Dashboard = () => {
     const [consumedCalories, setConsumedCalories] = useState(0);
     const [healthMetrics, setHealthMetrics] = useState([]);
     const [isLoadingHealth, setIsLoadingHealth] = useState(true);
-    const [isLoadingNutrition, setIsLoadingNutrition] = useState(true);
+    const [_isLoadingNutrition, setIsLoadingNutrition] = useState(true);
     const [isLoadingInsights, setIsLoadingInsights] = useState(true);
     const [insights, setInsights] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');

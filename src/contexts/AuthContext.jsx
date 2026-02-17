@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback, useContext, useRef } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import insforge from '../lib/insforge';
 
 const AuthContext = createContext(null);
@@ -97,14 +97,6 @@ export const AuthProvider = ({ children }) => {
             {children}
         </AuthContext.Provider>
     );
-};
-
-export const useAuth = () => {
-    const ctx = useContext(AuthContext);
-    if (!ctx) {
-        throw new Error('useAuth deve ser usado dentro de <AuthProvider>');
-    }
-    return ctx;
 };
 
 export default AuthContext;

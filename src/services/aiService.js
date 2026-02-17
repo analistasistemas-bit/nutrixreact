@@ -592,7 +592,7 @@ export async function getLatestNutritionPlan() {
             throw error;
         }
         return data;
-    } catch (e) {
+    } catch {
         console.warn("Nenhum plano alimentar encontrado para este usuário.");
         return null;
     }
@@ -600,7 +600,7 @@ export async function getLatestNutritionPlan() {
 
 export async function generateHealthInsights() {
     try {
-        const userEmail = await getAuthenticatedEmail();
+        await getAuthenticatedEmail();
 
         // 1. Coletar dados mais recentes para contexto
         const [history, measurement, plan] = await Promise.all([

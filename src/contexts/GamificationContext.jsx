@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import {
     calculateLevel,
     calculateLevelProgress,
@@ -7,6 +7,7 @@ import {
     getPetMood,
     getLevelTitle,
     pickDailyChallenges,
+    CHALLENGE_POOL,
     ACHIEVEMENTS,
     XP_REWARDS,
 } from '../data/gamificationData';
@@ -249,4 +250,3 @@ export const GamificationProvider = ({ children }) => {
         </GamificationContext.Provider>
     );
 };
-

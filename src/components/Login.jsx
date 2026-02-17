@@ -96,7 +96,7 @@ const Login = ({ onLogin }) => {
                     // Sign In Flow
                     await attemptLoginOnly();
                 }
-            } catch (err) {
+            } catch {
                 setError('Falha na conexão com o servidor.');
                 setIsLoading(false);
             }

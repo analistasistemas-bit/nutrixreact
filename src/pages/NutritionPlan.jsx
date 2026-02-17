@@ -5,7 +5,7 @@ import { analyzeNutritionPlan } from '../services/aiService';
 import AIAnalysisPage from '../components/common/AIAnalysisPage';
 
 const NutritionPlan = () => {
-    const { trackAction, addXP } = useGamification();
+    const { addXP } = useGamification();
 
     const [uploadedFile, setUploadedFile] = useState(null);
     const [analysisResult, setAnalysisResult] = useState(null);

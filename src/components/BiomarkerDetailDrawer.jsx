@@ -1,32 +1,9 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Target, X, Calendar, Activity, ArrowUpRight, ArrowDownRight, Minus, Info, History } from 'lucide-react';
 
 const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
     if (!biomarker) return null;
-
-    // Helper para formatar valores
-    const formatValue = (val) => {
-        if (val === null || val === undefined) return '--';
-        return val.toLocaleString('pt-BR');
-    };
-
-    // Helper para status
-    const getStatusColor = (value, target) => {
-        if (!target) return 'text-zinc-500 bg-zinc-100 dark:bg-zinc-800';
-        const [min, max] = target;
-        if (min !== null && value < min) return 'text-amber-500 bg-amber-500/10';
-        if (max !== null && value > max) return 'text-red-500 bg-red-500/10';
-        return 'text-emerald-500 bg-emerald-500/10';
-    };
-
-    const getStatusLabel = (value, target) => {
-        if (!target) return 'N/A';
-        const [min, max] = target;
-        if (min !== null && value < min) return 'BAIXO';
-        if (max !== null && value > max) return 'ALTO';
-        return 'NORMAL';
-    };
 
     return (
         <AnimatePresence>
@@ -121,9 +98,6 @@ const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
                                         </thead>
                                         <tbody className="divide-y divide-zinc-100 dark:divide-border-subtle bg-white dark:bg-bg-elevated">
                                             {[...biomarker.trend].reverse().map((point, index) => {
-                                                const pointStatusLabel = getStatusLabel(point.value, biomarker.target);
-                                                const pointStatusColor = getStatusColor(point.value, biomarker.target);
-
                                                 return (
                                                     <tr key={index} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                                                         <td className="px-4 py-3 font-mono text-zinc-500">{point.date}</td>

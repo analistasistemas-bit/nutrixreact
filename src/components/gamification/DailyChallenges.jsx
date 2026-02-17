@@ -4,7 +4,7 @@ import { Target, CheckCircle } from 'lucide-react';
 import { useGamification } from '../../hooks/useGamification';
 
 const DailyChallenges = () => {
-    const { dailyChallenges, completeChallenge } = useGamification();
+    const { dailyChallenges } = useGamification();
 
     const completedCount = dailyChallenges.filter(c => c.completed).length;
 

@@ -3,7 +3,7 @@ import { Ruler, Scale, CheckCircle, Calendar, ChevronDown, ChevronUp, FileText, 
 import { useGamification } from '../hooks/useGamification';
 import { analyzeMeasurements, getMeasurementHistory } from '../services/aiService';
 import AIAnalysisPage, { AIAnalysisResults } from '../components/common/AIAnalysisPage';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 
 const Measurements = () => {
     const [uploadedFile, setUploadedFile] = useState(null);

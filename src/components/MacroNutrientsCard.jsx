@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Flame, Droplet, Circle, ChevronDown } from 'lucide-react';
 
 const NutrientCard = ({ icon: Icon, title, consumed, goal, unit, colorClass, gradientClass, glowColor, compact }) => {
@@ -22,7 +22,7 @@ const NutrientCard = ({ icon: Icon, title, consumed, goal, unit, colorClass, gra
             className={`relative overflow-hidden bg-white/60 dark:bg-zinc-800/40 backdrop-blur-md rounded-2xl p-4 border border-white/20 dark:border-white/5 transition-all duration-300 shadow-lg shadow-black/5`}
         >
             <div className="flex items-center space-x-2 mb-3">
-                <Icon className={`w-5 h-5 ${colorClass}`} />
+                {React.createElement(Icon, { className: `w-5 h-5 ${colorClass}` })}
                 <h3 className={`font-bold text-zinc-900 dark:text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</h3>
             </div>
             <div className="mb-2">

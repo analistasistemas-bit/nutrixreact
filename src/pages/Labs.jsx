@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, Calendar, ChevronDown, ChevronUp, FileText, Clock } from 'lucide-react';
 import { useGamification } from '../hooks/useGamification';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { analyzeExam, getExamHistory } from '../services/aiService';
 import AIAnalysisPage, { AIAnalysisResults } from '../components/common/AIAnalysisPage';
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -14,6 +15,10 @@ import ReloadPrompt from './components/ReloadPrompt';
 
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
+  const handleLogin = React.useCallback((userData, token) => {
+    login(userData, token);
+    window.history.replaceState(null, '', '/');
+  }, [login]);
 
   // Splash enquanto verifica sessão
   if (isLoading) {
@@ -27,7 +32,7 @@ const AppContent = () => {
   if (!isAuthenticated) {
     return (
       <>
-        <Login onLogin={(userData, token) => login(userData, token)} />
+        <Login onLogin={handleLogin} />
         <ReloadPrompt />
       </>
     );

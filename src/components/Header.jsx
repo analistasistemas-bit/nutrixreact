@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
-import { Bell, ChevronDown, User, Settings, LogOut, Menu, X, Check, Moon, Sun } from 'lucide-react';
+import { Bell, ChevronDown, User, Settings, LogOut, Menu, X, Check, Moon, Sun, AlertTriangle, Trash2 } from 'lucide-react';
 import { tabs } from '../data/tabs';
 import { useGamification } from '../hooks/useGamification';
 import { useTheme } from '../hooks/useTheme';
+import { resetAuthenticatedUserData, RESET_CONFIRMATION_TEXT } from '../services/accountService';
 import NutrixoIcon from '../assets/nutrixo-icon-v2.png';
 
 const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMarkAllRead }) => {
@@ -16,6 +17,11 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [showMobileProfile, setShowMobileProfile] = useState(false);
     const [showMobileNotifications, setShowMobileNotifications] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [confirmPhrase, setConfirmPhrase] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [isDeletingData, setIsDeletingData] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
     const { petStage, level } = useGamification();
 
     // Extração segura de dados do usuário
@@ -34,6 +40,47 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
             setShowNotifications(false);
             setShowMobileNotifications(false);
         }, 200);
+    };
+
+    const openDeleteModal = () => {
+        setShowProfileMenu(false);
+        setShowMobileProfile(false);
+        setDeleteError('');
+        setConfirmPhrase('');
+        setConfirmPassword('');
+        setShowDeleteModal(true);
+    };
+
+    const closeDeleteModal = () => {
+        setShowDeleteModal(false);
+        setDeleteError('');
+        setConfirmPhrase('');
+        setConfirmPassword('');
+    };
+
+    const isDeleteConfirmationValid =
+        confirmPhrase.trim().toUpperCase() === RESET_CONFIRMATION_TEXT &&
+        confirmPassword.trim().length >= 6;
+
+    const handleDeleteData = async () => {
+        if (!isDeleteConfirmationValid || isDeletingData) return;
+
+        setIsDeletingData(true);
+        setDeleteError('');
+
+        try {
+            await resetAuthenticatedUserData({
+                password: confirmPassword,
+                confirmationText: confirmPhrase.trim().toUpperCase(),
+            });
+
+            closeDeleteModal();
+            await onLogout();
+        } catch (error) {
+            setDeleteError(error?.message || 'Falha ao excluir dados. Tente novamente.');
+        } finally {
+            setIsDeletingData(false);
+        }
     };
 
     return (
@@ -230,6 +277,18 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                                         </div>
                                                     </button>
                                                     <div className="h-px bg-gray-100 dark:bg-slate-800 my-1 mx-2"></div>
+                                                    <button
+                                                        onClick={openDeleteModal}
+                                                        className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors group"
+                                                    >
+                                                        <div className="p-1.5 bg-red-50 dark:bg-red-900/40 rounded-lg group-hover:bg-white dark:group-hover:bg-red-900/60 group-hover:shadow-sm transition-all">
+                                                            <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                                        </div>
+                                                        <span className="flex items-center gap-1.5">
+                                                            Excluir meus dados
+                                                            <AlertTriangle className="w-3.5 h-3.5" />
+                                                        </span>
+                                                    </button>
                                                     <button
                                                         onClick={onLogout}
                                                         className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors group"
@@ -449,6 +508,16 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
 
                                 <div className="mt-8 pt-6 border-t border-gray-100">
                                     <button
+                                        onClick={openDeleteModal}
+                                        className="w-full bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 font-bold p-4 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-transform hover:bg-red-100 dark:hover:bg-red-900/30 mb-3"
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                        <span className="flex items-center gap-1.5">
+                                            Excluir meus dados
+                                            <AlertTriangle className="w-4 h-4" />
+                                        </span>
+                                    </button>
+                                    <button
                                         onClick={onLogout}
                                         className="w-full bg-red-50 text-red-600 font-bold p-4 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-transform hover:bg-red-100"
                                     >
@@ -456,6 +525,107 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                         <span>Sair da Conta</span>
                                     </button>
                                     <p className="text-center text-gray-400 text-xs mt-4">Versão 1.0.2</p>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showDeleteModal && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => {
+                                if (!isDeletingData) closeDeleteModal();
+                            }}
+                            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[90]"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                            className="fixed z-[100] inset-0 p-4 sm:p-6 flex items-center justify-center"
+                        >
+                            <div className="w-full max-w-xl rounded-3xl border border-red-200/70 dark:border-red-900/40 bg-white dark:bg-zinc-900 shadow-2xl overflow-hidden">
+                                <div className="px-6 py-5 border-b border-red-100 dark:border-red-900/30 bg-red-50/70 dark:bg-red-900/10">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2 rounded-xl bg-red-100 dark:bg-red-900/40">
+                                            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-extrabold text-red-700 dark:text-red-400">Excluir todos os meus dados</h3>
+                                            <p className="text-xs text-red-600/80 dark:text-red-300/80 mt-1">
+                                                Esta ação é irreversível e remove seu histórico no Nutrixo.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="px-6 py-5 space-y-4">
+                                    <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 p-4">
+                                        <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Consequências</p>
+                                        <ul className="text-sm text-zinc-700 dark:text-zinc-300 space-y-1">
+                                            <li>Exclui exames, medidas, planos, refeições e histórico de chat.</li>
+                                            <li>Remove arquivos enviados no storage (bucket uploads).</li>
+                                            <li>Reinicia progresso/gamificação para o estado inicial.</li>
+                                            <li>Sua conta continua existindo, mas os dados serão perdidos.</li>
+                                        </ul>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                                            Digite exatamente: {RESET_CONFIRMATION_TEXT}
+                                        </label>
+                                        <input
+                                            value={confirmPhrase}
+                                            onChange={(e) => setConfirmPhrase(e.target.value)}
+                                            placeholder={RESET_CONFIRMATION_TEXT}
+                                            className="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500/40"
+                                            disabled={isDeletingData}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                                            Confirme sua senha
+                                        </label>
+                                        <input
+                                            type="password"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            placeholder="Sua senha atual"
+                                            className="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500/40"
+                                            disabled={isDeletingData}
+                                        />
+                                    </div>
+
+                                    {deleteError && (
+                                        <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+                                            {deleteError}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-3">
+                                    <button
+                                        onClick={closeDeleteModal}
+                                        disabled={isDeletingData}
+                                        className="px-4 py-2 rounded-xl text-sm font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-60"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteData}
+                                        disabled={!isDeleteConfirmationValid || isDeletingData}
+                                        className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        {isDeletingData ? 'Apagando dados...' : 'Apagar tudo e recomeçar'}
+                                    </button>
                                 </div>
                             </div>
                         </motion.div>

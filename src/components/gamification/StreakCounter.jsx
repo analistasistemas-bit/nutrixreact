@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Flame, Zap, Trophy, Snowflake } from 'lucide-react';
 import { useGamification } from '../../hooks/useGamification';
 

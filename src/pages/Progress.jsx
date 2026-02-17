@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import {
     ChartLine,
     Database,
@@ -32,7 +32,7 @@ import BiomarkerDetailDrawer from '../components/BiomarkerDetailDrawer';
 import { useGamification } from '../hooks/useGamification';
 
 // --- Sub-componente: InsightDrawer (Painel Lateral Contextual) ---
-const InsightDrawer = ({ isOpen, onClose, insightData }) => {
+const InsightDrawer = ({ isOpen, onClose }) => {
     return (
         <AnimatePresence>
             {isOpen && (
@@ -222,7 +222,7 @@ const AILogTerminal = () => {
             setCurrentLog((prev) => (prev + 1) % logs.length);
         }, 3000);
         return () => clearInterval(interval);
-    }, []);
+    }, [logs.length]);
 
     return (
         <div className="h-6 flex items-center justify-center overflow-hidden">
@@ -253,7 +253,7 @@ const SentinelCard = ({ label, value, unit, trend, status, color, icon: Icon, de
             const d = new Date(dateStr);
             if (isNaN(d.getTime())) return dateStr; // Fallback se já for formatada ou inválida
             return d.toLocaleDateString('pt-BR');
-        } catch (e) {
+        } catch {
             return dateStr;
         }
     };
@@ -268,7 +268,7 @@ const SentinelCard = ({ label, value, unit, trend, status, color, icon: Icon, de
         >
             <div className="flex items-center justify-between mb-4">
                 <div className={`p-2.5 rounded-2xl bg-opacity-10 bg-current`} style={{ color }}>
-                    <Icon className="w-5 h-5" />
+                    {React.createElement(Icon, { className: "w-5 h-5" })}
                 </div>
                 <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${status === 'success' ? 'bg-cyan-50 text-cyan-600 border-cyan-100 dark:bg-cyan-500/10 dark:border-cyan-500/20' :
                     'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:border-amber-500/20'
@@ -741,7 +741,7 @@ const EnhancedAreaChart = ({ data, color = "#06b6d4", height = 120, targetRange 
 
 const Progress = () => {
     const [activeTab, setActiveTab] = useState('overview');
-    const { trackAction } = useGamification();
+    useGamification();
 
     const [timeFilter, setTimeFilter] = useState('30d');
     const [sortBy, setSortBy] = useState('alphabetical'); // 'alphabetical' | 'problems'
@@ -750,7 +750,6 @@ const Progress = () => {
     const [measurements, setMeasurements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedBiomarker, setSelectedBiomarker] = useState(null);
-    const [isInsightDrawerOpen, setIsInsightDrawerOpen] = useState(false);
     const [selectedMarker, setSelectedMarker] = useState(null);
     const compRef = React.useRef(null);
     const bioRef = React.useRef(null);
@@ -763,16 +762,16 @@ const Progress = () => {
     };
 
     // --- Helpers de Dados (Definidos no topo para evitar Reference Errors) ---
-    const getBiomarkerTrend = (name) => {
+    const getBiomarkerTrend = useCallback((name) => {
         const trend = [];
         [...exams].reverse().forEach(exam => {
             const b = exam.analysis?.biomarkers?.find(x => x.name === name);
             if (b) trend.push({ value: b.value, date: new Date(exam.created_at).toLocaleDateString(), unit: b.unit });
         });
         return trend;
-    };
+    }, [exams]);
 
-    const getMeasurementTrend = (key) => {
+    const getMeasurementTrend = useCallback((key) => {
         const trend = [];
         const findValue = (obj, targetKey) => {
             if (!obj || typeof obj !== 'object') return undefined;
@@ -807,7 +806,7 @@ const Progress = () => {
             }
         });
         return trend;
-    };
+    }, [measurements]);
 
 
     useEffect(() => {
@@ -1057,7 +1056,7 @@ const Progress = () => {
                 </div>
             </div>
         ));
-    }, [exams, activeTab, sortBy, searchTerm]);
+    }, [exams, activeTab, sortBy, searchTerm, getBiomarkerTrend]);
 
 
     const physicalCards = React.useMemo(() => {
@@ -1195,7 +1194,7 @@ const Progress = () => {
                 return a.label.localeCompare(b.label);
             });
 
-        return cards.map(({ key, label, meta, biomarkerData, displayValue, lastData, status, trend }) => (
+        return cards.map(({ key, label, meta, biomarkerData, displayValue, lastData, status }) => (
             <div key={key} className="p-8 bg-zinc-50/50 dark:bg-bg-secondary rounded-[3rem] border border-zinc-200 dark:border-border-subtle space-y-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -1233,7 +1232,7 @@ const Progress = () => {
                 </div>
             </div>
         ));
-    }, [measurements, activeTab, sortBy, searchTerm]);
+    }, [measurements, sortBy, searchTerm, getMeasurementTrend]);
 
     const detectedInsights = React.useMemo(() => {
         if (!exams.length || !measurements.length) return [];
@@ -1366,7 +1365,7 @@ const Progress = () => {
         // Ordenar por prioridade (1 é maior prioridade) e limitar ou garantir os 3
         const sorted = insights.sort((a, b) => a.priority - b.priority);
         return sorted.slice(0, Math.max(3, sorted.length));
-    }, [exams, measurements]);
+    }, [exams, measurements, getBiomarkerTrend, getMeasurementTrend]);
 
     if (isLoading) {
         return (
@@ -1376,12 +1375,6 @@ const Progress = () => {
             </div>
         );
     }
-
-    const weightTrend = getMeasurementTrend('weight');
-    const fatTrend = getMeasurementTrend('bodyFat');
-    const vitDTrend = getBiomarkerTrend('Vitamina D');
-    const glucoseTrend = getBiomarkerTrend('Glicose');
-
 
     return (
         <div className="max-w-5xl mx-auto space-y-6 pb-20">
@@ -1619,14 +1612,6 @@ const Progress = () => {
                                                 // Aqui vamos assumir que se já existe, não sobrescrevemos, a menos que o novo tenha dados e o antigo não (embora filtering acima já garanta dados)
                                                 if (!uniqueMap.has(label)) {
                                                     uniqueMap.set(label, item);
-                                                } else {
-                                                    // Opcional: Lógica de "merge" ou escolha do melhor dado
-                                                    const existing = uniqueMap.get(label);
-                                                    // Se o item atual tem data mais recente que o existente, substitui (assumindo que created_at está disponível e parseável, mas aqui estamos pegando do 'latest' que é o mesmo objeto pai)
-                                                    // Como a origem é 'latest', todos têm a mesma data base.
-                                                    // Então é duplicidade de chaves diferentes mapeando para mesmo nome (ex: muscleMass e leanBodyMass)
-                                                    // Preferência: chaves que não sejam 'mass' genéricas se houver conflito?
-                                                    // Simplesmente manter o primeiro encontrado (que foi ordenado alfabeticamente)
                                                 }
                                             });
 

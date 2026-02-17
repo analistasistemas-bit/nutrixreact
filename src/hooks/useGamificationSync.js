@@ -37,7 +37,7 @@ export const useGamificationSync = (totalXP, level, setTotalXP, userEmail = 'dem
         };
 
         loadProfile();
-    }, [userEmail]); // Só roda no mount ou se o user mudar
+    }, [userEmail, level, setTotalXP, totalXP]); // Só roda no mount ou se o user mudar
 
     // Salvar sempre que o XP mudar (Debounced opcionalmente, mas aqui faremos direto por enquanto)
     const persistXP = useCallback(async (newXP, newLevel) => {
