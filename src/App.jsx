@@ -11,6 +11,8 @@ import Progress from './pages/Progress';
 import NutritionPlan from './pages/NutritionPlan';
 import Food from './pages/Food';
 import GamerProfile from './pages/GamerProfile';
+import AccountProfile from './pages/AccountProfile';
+import AccountSettings from './pages/AccountSettings';
 import ReloadPrompt from './components/ReloadPrompt';
 
 const AppContent = () => {
@@ -55,6 +57,8 @@ const AppContent = () => {
           <Route path="nutrition-plan" element={<NutritionPlan />} />
           <Route path="food" element={<Food />} />
           <Route path="gamer-profile" element={<GamerProfile />} />
+          <Route path="account/profile" element={<AccountProfile />} />
+          <Route path="account/settings" element={<AccountSettings />} />
         </Route>
       </Routes>
       <ReloadPrompt />

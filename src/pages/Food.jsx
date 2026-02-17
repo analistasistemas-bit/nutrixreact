@@ -11,6 +11,17 @@ const MEAL_TYPES = [
     { id: 'jantar', label: 'Jantar', emoji: '🌙' },
 ];
 
+const QUANTITY_PATTERNS = [
+    /\b\d+(?:[.,]\d+)?\s?(?:g|gramas?|kg|ml|l|litros?|colheres?|x[ií]caras?|xicaras?|fatias?|unidades?|unid\.?)\b/i,
+    /\b\d+(?:[.,]\d+)?\s?(?:de\s+)?[a-zà-ÿ]{2,}\b/i,
+];
+
+const hasFoodQuantity = (text = '') => {
+    const normalized = text.trim();
+    if (!normalized) return false;
+    return QUANTITY_PATTERNS.some((pattern) => pattern.test(normalized));
+};
+
 const Food = () => {
     const [selectedMeal, setSelectedMeal] = useState(MEAL_TYPES[0]);
     const [activeMode, setActiveMode] = useState(null);
@@ -20,6 +31,8 @@ const Food = () => {
     const [previewUrl, setPreviewUrl] = useState(null);
     const [voiceText, setVoiceText] = useState('');
     const [isListening, setIsListening] = useState(false);
+    const [estimationNotice, setEstimationNotice] = useState('');
+    const [pendingAnalysis, setPendingAnalysis] = useState(null);
     const fileInputRef = useRef(null);
     const recognitionRef = useRef(null);
     const { addXP } = useGamification();
@@ -91,43 +104,81 @@ const Food = () => {
         setIsListening(false);
     };
 
-    const submitVoiceText = async () => {
-        if (!voiceText.trim()) return;
+    const runTextAnalysis = async (text, inputMethod, shouldAssumeDefaultPortions) => {
+        if (!text.trim()) return;
 
+        setActiveMode(inputMethod === 'manual' ? 'manual' : 'voice');
         setIsAnalyzing(true);
         setError(null);
+        setEstimationNotice(
+            shouldAssumeDefaultPortions
+                ? 'Sem quantidades informadas. A IA vai usar porções padrão para estimar os nutrientes.'
+                : ''
+        );
 
         try {
-            const result = await analyzeFoodDescription(voiceText, selectedMeal.label);
-            setAnalysisResult(result.analysis);
+            const result = await analyzeFoodDescription(text, selectedMeal.label, { inputMethod });
+            const nextAnalysis = {
+                ...result.analysis,
+                ...(shouldAssumeDefaultPortions
+                    ? {
+                        assumedPortions: true,
+                        estimationWarning:
+                                result.analysis?.estimationWarning ||
+                                'Quantidades não informadas. A estimativa foi feita com porções padrão.',
+                    }
+                    : {}),
+            };
+            setAnalysisResult(nextAnalysis);
             addXP('LOG_MEAL');
         } catch (err) {
             console.error('Erro:', err);
-            setError(err.message || 'Erro ao analisar a descrição.');
+            const errorMessage = err?.message || 'Erro ao analisar.';
+            if (/invalid token|sess[aã]o/i.test(errorMessage)) {
+                setError('Sessão inválida ou expirada. Faça logout e login novamente para continuar.');
+            } else {
+                setError(errorMessage);
+            }
         } finally {
             setIsAnalyzing(false);
         }
+    };
+
+    const submitVoiceText = async () => {
+        if (!voiceText.trim()) return;
+        const shouldAssumeDefaultPortions = !hasFoodQuantity(voiceText);
+
+        if (shouldAssumeDefaultPortions) {
+            setPendingAnalysis({ text: voiceText, inputMethod: 'voice' });
+            return;
+        }
+
+        await runTextAnalysis(voiceText, 'voice', false);
     };
 
     // ========== MANUAL TEXT ==========
     const [manualText, setManualText] = useState('');
     const handleManualSubmit = async () => {
         if (!manualText.trim()) return;
-        setActiveMode('manual');
-        setIsAnalyzing(true);
-        setError(null);
-        setAnalysisResult(null);
-
-        try {
-            const result = await analyzeFoodDescription(manualText, selectedMeal.label);
-            setAnalysisResult(result.analysis);
-            addXP('LOG_MEAL');
-        } catch (err) {
-            console.error('Erro:', err);
-            setError(err.message || 'Erro ao analisar.');
-        } finally {
-            setIsAnalyzing(false);
+        const shouldAssumeDefaultPortions = !hasFoodQuantity(manualText);
+        if (shouldAssumeDefaultPortions) {
+            setPendingAnalysis({ text: manualText, inputMethod: 'manual' });
+            return;
         }
+
+        await runTextAnalysis(manualText, 'manual', false);
+    };
+
+    const confirmEstimatedAnalysis = async () => {
+        if (!pendingAnalysis?.text) return;
+        const { text, inputMethod } = pendingAnalysis;
+        setPendingAnalysis(null);
+        await runTextAnalysis(text, inputMethod, true);
+    };
+
+    const cancelEstimatedAnalysis = () => {
+        setPendingAnalysis(null);
+        setEstimationNotice('');
     };
 
     // ========== RESET ==========
@@ -139,6 +190,8 @@ const Food = () => {
         setVoiceText('');
         setManualText('');
         setIsListening(false);
+        setEstimationNotice('');
+        setPendingAnalysis(null);
     };
 
     return (
@@ -151,7 +204,7 @@ const Food = () => {
             <div className="bg-white dark:bg-bg-elevated rounded-2xl border border-gray-200 dark:border-border-subtle p-6 shadow-sm">
                 {/* Header */}
                 <div className="text-center mb-6">
-                    <div className="w-14 h-14 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-sm">
+                    <div className="w-14 h-14 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-sm shadow-cyan-900/30">
                         <UtensilsCrossed className="w-7 h-7 text-white" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">🍽️ Registrar Alimentação</h2>
@@ -167,7 +220,7 @@ const Food = () => {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setSelectedMeal(meal)}
                             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedMeal.id === meal.id
-                                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-sm'
+                                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-sm shadow-cyan-900/30'
                                 : 'bg-gray-100 dark:bg-bg-secondary text-gray-600 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-bg-hover'
                                 }`}
                         >
@@ -186,7 +239,7 @@ const Food = () => {
                                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} ref={fileInputRef} className="hidden" />
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-full p-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-bold text-sm flex items-center justify-center space-x-2 hover:from-orange-400 hover:to-red-400 transition-all"
+                                    className="w-full p-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold text-sm flex items-center justify-center space-x-2 hover:from-cyan-400 hover:to-blue-500 transition-all"
                                 >
                                     <Camera className="w-5 h-5" />
                                     <span>📸 Tirar Foto da Refeição</span>
@@ -211,17 +264,41 @@ const Food = () => {
                             <textarea
                                 value={manualText}
                                 onChange={(e) => setManualText(e.target.value)}
-                                placeholder="Ex: Arroz integral, frango grelhado, salada e feijão..."
-                                className="w-full p-3 border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none resize-none dark:text-white dark:placeholder-gray-500"
+                                placeholder="Ex: 120g arroz integral, 150g frango grelhado, 80g feijão e 60g salada"
+                                className="w-full p-3 border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 focus:outline-none resize-none dark:text-white dark:placeholder-gray-500"
                                 rows={3}
                             />
+                            <p className="mt-2 text-xs text-gray-500 dark:text-text-muted">
+                                Para maior precisão, informe alimento + quantidade em gramas.
+                            </p>
                             <button
                                 onClick={handleManualSubmit}
                                 disabled={!manualText.trim()}
-                                className="mt-2 w-full py-2 bg-orange-500 text-white rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-400 transition-colors"
+                                className="mt-2 w-full py-2 bg-cyan-600 text-white rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-cyan-500 transition-colors"
                             >
                                 Analisar com IA 🤖
                             </button>
+                            {pendingAnalysis?.inputMethod === 'manual' && (
+                                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3">
+                                    <p className="text-xs text-amber-900 font-semibold">
+                                        Não encontramos quantidades na descrição. Deseja continuar com estimativa padrão?
+                                    </p>
+                                    <div className="mt-2 flex gap-2">
+                                        <button
+                                            onClick={confirmEstimatedAnalysis}
+                                            className="flex-1 py-2 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-400"
+                                        >
+                                            Continuar
+                                        </button>
+                                        <button
+                                            onClick={cancelEstimatedAnalysis}
+                                            className="flex-1 py-2 rounded-lg border border-amber-300 text-amber-900 text-xs font-bold hover:bg-amber-100"
+                                        >
+                                            Não, revisar
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -262,6 +339,27 @@ const Food = () => {
                                         Cancelar
                                     </button>
                                 </div>
+                                {pendingAnalysis?.inputMethod === 'voice' && (
+                                    <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3">
+                                        <p className="text-xs text-amber-900 font-semibold">
+                                            Não encontramos quantidades na descrição. Deseja continuar com estimativa padrão?
+                                        </p>
+                                        <div className="mt-2 flex gap-2">
+                                            <button
+                                                onClick={confirmEstimatedAnalysis}
+                                                className="flex-1 py-2 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-400"
+                                            >
+                                                Continuar
+                                            </button>
+                                            <button
+                                                onClick={cancelEstimatedAnalysis}
+                                                className="flex-1 py-2 rounded-lg border border-amber-300 text-amber-900 text-xs font-bold hover:bg-amber-100"
+                                            >
+                                                Não, revisar
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </motion.div>
@@ -276,12 +374,17 @@ const Food = () => {
 
                 {/* Loading State */}
                 {isAnalyzing && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-orange-50 border border-orange-200 rounded-xl p-5 text-center mt-4">
-                        <Loader2 className="w-10 h-10 text-orange-600 mx-auto mb-3 animate-spin" />
-                        <h3 className="font-bold text-orange-800 text-lg">🤖 IA Analisando {selectedMeal.label}...</h3>
-                        <p className="text-orange-700 text-sm mt-1">Identificando alimentos e estimando nutrientes ⚡</p>
-                        <div className="mt-3 w-full bg-orange-200 rounded-full h-2">
-                            <motion.div className="bg-orange-500 h-2 rounded-full" initial={{ width: '0%' }} animate={{ width: '90%' }} transition={{ duration: 6, ease: 'easeOut' }} />
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-cyan-50 border border-cyan-200 dark:bg-cyan-900/10 dark:border-cyan-900/40 rounded-xl p-5 text-center mt-4">
+                        <Loader2 className="w-10 h-10 text-cyan-600 dark:text-cyan-300 mx-auto mb-3 animate-spin" />
+                        <h3 className="font-bold text-cyan-800 dark:text-cyan-200 text-lg">🤖 IA Analisando {selectedMeal.label}...</h3>
+                        <p className="text-cyan-700 dark:text-cyan-300/90 text-sm mt-1">Identificando alimentos e estimando nutrientes ⚡</p>
+                        {estimationNotice && (
+                            <p className="mt-2 text-xs font-medium text-amber-700 bg-amber-100 border border-amber-200 rounded-lg px-2 py-1 inline-block">
+                                ⚠️ {estimationNotice}
+                            </p>
+                        )}
+                        <div className="mt-3 w-full bg-cyan-200 dark:bg-cyan-950/50 rounded-full h-2">
+                            <motion.div className="bg-cyan-500 h-2 rounded-full" initial={{ width: '0%' }} animate={{ width: '90%' }} transition={{ duration: 6, ease: 'easeOut' }} />
                         </div>
                     </motion.div>
                 )}
@@ -318,10 +421,15 @@ const Food = () => {
                             </div>
 
                             {/* Totals */}
-                            <div className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/10 dark:to-red-900/10 border border-orange-200 dark:border-orange-900/30 rounded-xl p-5">
-                                <h3 className="font-bold text-orange-800 dark:text-orange-400 mb-3">{selectedMeal.emoji} {selectedMeal.label}</h3>
+                            <div className="bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-900/10 dark:to-blue-900/10 border border-cyan-200 dark:border-cyan-900/30 rounded-xl p-5">
+                                <h3 className="font-bold text-cyan-800 dark:text-cyan-300 mb-3">{selectedMeal.emoji} {selectedMeal.label}</h3>
                                 {analysisResult.description && (
                                     <p className="text-gray-600 dark:text-text-secondary text-sm mb-3">{analysisResult.description}</p>
+                                )}
+                                {analysisResult.estimationWarning && (
+                                    <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-200">
+                                        ⚠️ {analysisResult.estimationWarning}
+                                    </div>
                                 )}
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                     <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
@@ -360,7 +468,7 @@ const Food = () => {
                                                 <p className="text-gray-500 dark:text-text-muted text-xs">{food.portion}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="font-bold text-orange-600 dark:text-orange-400 text-sm">{food.calories} kcal</p>
+                                                <p className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">{food.calories} kcal</p>
                                                 <p className="text-gray-400 dark:text-text-disabled text-xs">P:{food.protein}g C:{food.carbs}g G:{food.fats}g</p>
                                             </div>
                                         </motion.div>

@@ -49,6 +49,77 @@ async function getAuthenticatedEmail() {
     return email;
 }
 
+function isTokenError(error) {
+    const message = `${error?.message || ''} ${error?.error_description || ''}`.toLowerCase();
+    return (
+        message.includes('invalid token') ||
+        message.includes('jwt') ||
+        message.includes('token') ||
+        error?.status === 401
+    );
+}
+
+function getCsrfTokenFromCookie() {
+    if (typeof document === 'undefined') return null;
+    const cookie = document.cookie
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith('insforge_csrf_token='));
+    if (!cookie) return null;
+    return decodeURIComponent(cookie.split('=')[1] || '');
+}
+
+async function refreshSessionSilently() {
+    const auth = insforge.auth;
+    const internalHttp = auth?.http;
+    const tokenManager = auth?.tokenManager;
+
+    if (!internalHttp?.post) return false;
+
+    try {
+        const csrfToken = getCsrfTokenFromCookie();
+        const response = await internalHttp.post('/api/auth/refresh', undefined, {
+            headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+            credentials: 'include',
+        });
+
+        if (!response?.accessToken) return false;
+
+        tokenManager?.setMemoryMode?.();
+        tokenManager?.setAccessToken?.(response.accessToken);
+        tokenManager?.setUser?.(response.user);
+        internalHttp.setAuthToken?.(response.accessToken);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function runWithTokenRetry(operation) {
+    try {
+        return await operation();
+    } catch (error) {
+        if (!isTokenError(error)) throw error;
+
+        const refreshed = await refreshSessionSilently();
+        if (!refreshed) {
+            const { data } = await insforge.auth.getCurrentSession();
+            if (!data?.session) {
+                throw new Error('🔒 Sessão expirada. Faça login novamente.');
+            }
+        }
+
+        try {
+            return await operation();
+        } catch (retryError) {
+            if (isTokenError(retryError)) {
+                throw new Error('🔒 Sessão inválida. Faça logout e login novamente.');
+            }
+            throw retryError;
+        }
+    }
+}
+
 // ============================================================
 // 🧪 EXAMS - Analyze blood test PDFs
 // ============================================================
@@ -428,10 +499,11 @@ Retorne APENAS o JSON.`
 // ============================================================
 // 🎤 FOOD - Analyze voice/text description
 // ============================================================
-export async function analyzeFoodDescription(text, mealType) {
+export async function analyzeFoodDescription(text, mealType, options = {}) {
     const userEmail = await getAuthenticatedEmail();
+    const { inputMethod = 'voice' } = options;
 
-    const completion = await insforge.ai.chat.completions.create({
+    const completion = await runWithTokenRetry(() => insforge.ai.chat.completions.create({
         model: AI_MODEL,
         messages: [
             {
@@ -456,7 +528,7 @@ Retorne APENAS o JSON.`
                 content: `Para o ${mealType}, eu comi: ${text}`,
             },
         ],
-    });
+    }));
 
     const responseText = completion.choices[0].message.content;
     let analysis;
@@ -468,12 +540,12 @@ Retorne APENAS o JSON.`
     }
 
     // Save meal to DB — associado ao user autenticado
-    const { data: meal } = await insforge.database
+    const { data: meal, error: mealInsertError } = await runWithTokenRetry(() => insforge.database
         .from('nutrixo_meals')
         .insert([{
             user_email: userEmail,
             meal_type: mealType,
-            input_method: 'voice',
+            input_method: inputMethod,
             description: text,
             analysis,
             calories: analysis.totalCalories || 0,
@@ -482,7 +554,11 @@ Retorne APENAS o JSON.`
             fats: analysis.totalFats || 0,
         }])
         .select()
-        .single();
+        .single());
+
+    if (mealInsertError) {
+        throw new Error(mealInsertError.message || 'Erro ao salvar refeição.');
+    }
 
     return { id: meal?.id, analysis };
 }

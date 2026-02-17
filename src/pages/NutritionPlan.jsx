@@ -45,7 +45,7 @@ const NutritionPlan = () => {
                 icon={ClipboardList}
                 title="Plano Alimentar Inteligente"
                 description="Faça upload do seu plano alimentar e receba análise + sugestões por IA 🤖"
-                gradient="from-green-500 to-emerald-500"
+                gradient="from-cyan-500 to-blue-600"
             />
 
             <AIAnalysisPage.UploadZone
@@ -55,25 +55,25 @@ const NutritionPlan = () => {
                 label="Selecionar Plano Alimentar"
             />
 
-            <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message="IA Analisando Plano..." gradient="bg-emerald-500" />
+            <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message="IA Analisando Plano..." gradient="bg-cyan-500" />
             <AIAnalysisPage.Error error={error} onReset={resetUpload} />
 
             <AIAnalysisPage.Results show={!!analysisResult}>
                 {/* Success */}
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-xl p-3 flex items-center justify-between">
+                <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800/50 rounded-xl p-3 flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                        <span className="font-bold text-green-800 dark:text-green-400 text-sm">Plano Analisado! +40 XP</span>
+                        <CheckCircle className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                        <span className="font-bold text-cyan-800 dark:text-cyan-300 text-sm">Plano Analisado! +40 XP</span>
                     </div>
-                    <button onClick={resetUpload} className="text-green-700 dark:text-green-400 text-xs font-medium underline hover:text-green-900 dark:hover:text-green-300">
+                    <button onClick={resetUpload} className="text-cyan-700 dark:text-cyan-300 text-xs font-medium underline hover:text-cyan-900 dark:hover:text-cyan-200">
                         Enviar novo plano
                     </button>
                 </div>
 
                 {/* Daily Macros */}
                 {analysisResult?.dailyMacros && (
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 border border-green-200 dark:border-border-subtle rounded-xl p-5 shadow-sm">
-                        <h3 className="font-bold text-green-800 dark:text-green-400 mb-3 text-lg">🔥 Macros Diários do Plano</h3>
+                    <div className="bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-900/10 dark:to-blue-900/10 border border-cyan-200 dark:border-border-subtle rounded-xl p-5 shadow-sm">
+                        <h3 className="font-bold text-cyan-800 dark:text-cyan-300 mb-3 text-lg">🔥 Macros Diários do Plano</h3>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="bg-white dark:bg-bg-secondary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                 <p className="text-xs text-gray-500 dark:text-text-muted">Calorias</p>
@@ -90,7 +90,7 @@ const NutritionPlan = () => {
                             </div>
                             <div className="bg-white dark:bg-bg-secondary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                 <p className="text-xs text-gray-500 dark:text-text-muted">🥑 Gorduras</p>
-                                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{analysisResult.dailyMacros.fats}g</p>
+                                <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{analysisResult.dailyMacros.fats}g</p>
                             </div>
                         </div>
                     </div>
@@ -99,7 +99,7 @@ const NutritionPlan = () => {
                 {/* Meals */}
                 {analysisResult?.meals?.length > 0 && (
                     <div className="space-y-3">
-                        <h3 className="font-bold text-lg text-green-700 dark:text-green-400">🍽️ Refeições do Plano</h3>
+                        <h3 className="font-bold text-lg text-cyan-700 dark:text-cyan-300">🍽️ Refeições do Plano</h3>
                         {analysisResult.meals.map((meal, idx) => (
                             <motion.div
                                 key={idx}
@@ -110,10 +110,10 @@ const NutritionPlan = () => {
                             >
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center space-x-2">
-                                        <UtensilsCrossed className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                        <UtensilsCrossed className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                                         <h4 className="font-bold text-gray-900 dark:text-text-primary">{meal.time} — {meal.name}</h4>
                                     </div>
-                                    <span className="text-sm font-bold text-green-600 dark:text-green-400">{meal.calories} kcal</span>
+                                    <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400">{meal.calories} kcal</span>
                                 </div>
                                 {meal.ingredients && (
                                     <div className="flex flex-wrap gap-1.5 mt-2">
@@ -136,20 +136,20 @@ const NutritionPlan = () => {
 
                 {/* Summary */}
                 {analysisResult?.summary && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-border-subtle rounded-xl p-4">
-                        <h3 className="font-bold text-green-800 dark:text-green-400 text-sm mb-1">📝 Resumo do Plano</h3>
-                        <p className="text-green-700 dark:text-text-secondary text-sm">{analysisResult.summary}</p>
+                    <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-border-subtle rounded-xl p-4">
+                        <h3 className="font-bold text-cyan-800 dark:text-cyan-300 text-sm mb-1">📝 Resumo do Plano</h3>
+                        <p className="text-cyan-700 dark:text-text-secondary text-sm">{analysisResult.summary}</p>
                     </div>
                 )}
 
                 {/* Suggestions */}
                 {analysisResult?.suggestions?.length > 0 && (
-                    <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-border-subtle rounded-xl p-4">
-                        <h3 className="font-bold text-emerald-800 dark:text-emerald-400 text-sm mb-2">💡 Sugestões da IA</h3>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-border-subtle rounded-xl p-4">
+                        <h3 className="font-bold text-blue-800 dark:text-blue-300 text-sm mb-2">💡 Sugestões da IA</h3>
                         <ul className="space-y-1">
                             {analysisResult.suggestions.map((sug, idx) => (
-                                <li key={idx} className="flex items-start space-x-2 text-sm text-emerald-700 dark:text-text-secondary">
-                                    <span className="text-emerald-400 mt-1">•</span>
+                                <li key={idx} className="flex items-start space-x-2 text-sm text-blue-700 dark:text-text-secondary">
+                                    <span className="text-blue-400 mt-1">•</span>
                                     <span>{sug}</span>
                                 </li>
                             ))}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
-import { Bell, ChevronDown, User, Settings, LogOut, Menu, X, Check, Moon, Sun, AlertTriangle, Trash2 } from 'lucide-react';
+import { Bell, ChevronDown, User, Settings, LogOut, Menu, X, Check, Moon, Sun, AlertTriangle, Trash2, Trophy } from 'lucide-react';
 import { tabs } from '../data/tabs';
 import { useGamification } from '../hooks/useGamification';
 import { useTheme } from '../hooks/useTheme';
@@ -105,17 +105,32 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                 {tabs.map((tab) => (
                                     <motion.button
                                         key={tab.id}
-                                        onClick={() => navigate(tab.path)}
+                                        onClick={() => {
+                                            if (!tab.comingSoon) {
+                                                navigate(tab.path);
+                                            }
+                                        }}
                                         whileHover={{ y: -1, scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
                                         transition={{ duration: 0.15 }}
-                                        className={`relative flex items-center space-x-2 px-5 py-3 h-11 rounded-full font-bold text-sm tracking-tight border transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 select-none ${activeTab === tab.id
+                                        title={tab.comingSoon ? `${tab.label} em breve.` : tab.label}
+                                        aria-disabled={tab.comingSoon ? 'true' : 'false'}
+                                        className={`relative flex items-center space-x-2 px-5 py-3 ${tab.comingSoon ? 'h-14' : 'h-11'} rounded-full font-bold text-sm tracking-tight border transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 select-none ${tab.comingSoon
+                                            ? 'opacity-60 cursor-not-allowed border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 bg-zinc-100/60 dark:bg-zinc-800/40'
+                                            : activeTab === tab.id
                                             ? 'bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-500 dark:to-blue-500 border-transparent text-white shadow-md shadow-cyan-500/25 dark:shadow-cyan-500/10 ring-1 ring-black/5 dark:ring-white/10'
                                             : 'bg-white/80 dark:bg-bg-elevated border-gray-200/60 dark:border-border-subtle text-slate-600 dark:text-text-secondary hover:bg-slate-50 dark:hover:bg-bg-hover hover:border-slate-300 dark:hover:border-border-strong hover:text-slate-900 dark:hover:text-text-primary hover:shadow-sm'
                                             }`}
                                     >
                                         <span className={`text-base leading-none filter ${activeTab === tab.id ? 'drop-shadow-sm' : ''} transition-transform duration-200 group-hover:scale-110`}>{tab.emoji}</span>
-                                        <span className="hidden xl:inline">{tab.label}</span>
+                                        <span className="hidden xl:flex flex-col items-start leading-tight">
+                                            <span>{tab.label}</span>
+                                            {tab.comingSoon && (
+                                                <span className="text-[8px] font-bold uppercase leading-none mt-0.5 px-1 py-[1px] rounded-full bg-zinc-200/80 dark:bg-zinc-700/80 text-zinc-600 dark:text-zinc-300">
+                                                    Em breve
+                                                </span>
+                                            )}
+                                        </span>
                                     </motion.button>
                                 ))}
                             </div>
@@ -236,7 +251,32 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                                             </motion.div>
                                                         )}
                                                     </AnimatePresence>
-                                                    <button className="w-full px-3 py-2.5 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group">
+
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate('/gamer-profile');
+                                                            setShowProfileMenu(false);
+                                                        }}
+                                                        className="w-full px-3 py-2.5 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group"
+                                                    >
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-900/30">
+                                                                <Trophy className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100">Conquistas</p>
+                                                                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Ver nível, badges e desafios</p>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate('/account/profile');
+                                                            setShowProfileMenu(false);
+                                                        }}
+                                                        className="w-full px-3 py-2.5 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group"
+                                                    >
                                                         <div className="flex items-center space-x-3">
                                                             <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-900/30">
                                                                 <User className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
@@ -247,7 +287,13 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                                             </div>
                                                         </div>
                                                     </button>
-                                                    <button className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group">
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate('/account/settings');
+                                                            setShowProfileMenu(false);
+                                                        }}
+                                                        className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 rounded-xl transition-colors group"
+                                                    >
                                                         <div className="flex items-center space-x-3">
                                                             <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-900/30">
                                                                 <Settings className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -352,13 +398,19 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                     <motion.button
                                         key={tab.id}
                                         onClick={() => {
-                                            navigate(tab.path);
-                                            setIsMenuOpen(false);
+                                            if (!tab.comingSoon) {
+                                                navigate(tab.path);
+                                                setIsMenuOpen(false);
+                                            }
                                         }}
                                         whileTap={{ scale: 0.96 }}
+                                        title={tab.comingSoon ? `${tab.label} em breve.` : tab.label}
+                                        aria-disabled={tab.comingSoon ? 'true' : 'false'}
                                         className={`flex items-center space-x-2 px-4 py-3 rounded-full font-bold transition-all duration-200 border w-full text-sm ${activeTab === tab.id
                                             ? 'bg-gradient-to-r from-cyan-600 to-blue-600 border-transparent text-white shadow-md'
-                                            : 'bg-white border-gray-200 text-slate-600'
+                                            : tab.comingSoon
+                                                ? 'bg-zinc-100/70 dark:bg-zinc-800/50 border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 opacity-60 cursor-not-allowed'
+                                                : 'bg-white border-gray-200 text-slate-600'
                                             }`}
                                     >
                                         <span className="text-lg">{tab.emoji}</span>
@@ -480,14 +532,39 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                 </div>
 
                                 <div className="space-y-3">
-                                    <button className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex items-center space-x-4 text-zinc-700 dark:text-zinc-200 font-bold active:scale-95 transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 hover:border-cyan-200 shadow-sm">
+                                    <button
+                                        onClick={() => {
+                                            navigate('/gamer-profile');
+                                            setShowMobileProfile(false);
+                                        }}
+                                        className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex items-center space-x-4 text-zinc-700 dark:text-zinc-200 font-bold active:scale-95 transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 hover:border-cyan-200 shadow-sm"
+                                    >
+                                        <div className="p-2 bg-cyan-50 dark:bg-cyan-900/30 rounded-lg text-cyan-600 dark:text-cyan-400">
+                                            <Trophy className="w-5 h-5" />
+                                        </div>
+                                        <span>Conquistas</span>
+                                        <ChevronDown className="w-5 h-5 ml-auto -rotate-90 text-zinc-300 dark:text-zinc-600" />
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            navigate('/account/profile');
+                                            setShowMobileProfile(false);
+                                        }}
+                                        className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex items-center space-x-4 text-zinc-700 dark:text-zinc-200 font-bold active:scale-95 transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 hover:border-cyan-200 shadow-sm"
+                                    >
                                         <div className="p-2 bg-cyan-50 dark:bg-cyan-900/30 rounded-lg text-cyan-600 dark:text-cyan-400">
                                             <User className="w-5 h-5" />
                                         </div>
-                                        <span>Ver Perfil Completo</span>
+                                        <span>Meu Perfil</span>
                                         <ChevronDown className="w-5 h-5 ml-auto -rotate-90 text-zinc-300 dark:text-zinc-600" />
                                     </button>
-                                    <button className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex items-center space-x-4 text-zinc-700 dark:text-zinc-200 font-bold active:scale-95 transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 hover:border-cyan-200 shadow-sm">
+                                    <button
+                                        onClick={() => {
+                                            navigate('/account/settings');
+                                            setShowMobileProfile(false);
+                                        }}
+                                        className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-4 rounded-xl flex items-center space-x-4 text-zinc-700 dark:text-zinc-200 font-bold active:scale-95 transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-800/80 hover:border-cyan-200 shadow-sm"
+                                    >
                                         <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
                                             <Settings className="w-5 h-5" />
                                         </div>

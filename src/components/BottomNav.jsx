@@ -21,15 +21,28 @@ const BottomNav = () => {
                 {tabs.map((tab) => (
                     <motion.button
                         key={tab.id}
-                        onClick={() => navigate(tab.path)}
+                        onClick={() => {
+                            if (!tab.comingSoon) {
+                                navigate(tab.path);
+                            }
+                        }}
                         whileTap={{ scale: 0.9 }}
+                        title={tab.comingSoon ? `${tab.label} em breve.` : tab.label}
+                        aria-disabled={tab.comingSoon ? 'true' : 'false'}
                         className={`flex flex-col items-center p-1 rounded-lg flex-shrink-0 min-w-[56px] ${activeTab === tab.id
                             ? 'text-cyan-800 bg-cyan-100 dark:bg-cyan-900/40 dark:text-cyan-200 font-bold'
+                            : tab.comingSoon
+                                ? 'text-gray-400 dark:text-text-disabled opacity-60 cursor-not-allowed'
                             : 'text-gray-400 dark:text-text-disabled'
                             }`}
                     >
                         <span className="text-xl mb-1">{tab.emoji}</span>
                         <span className="text-[10px] font-medium whitespace-nowrap">{tab.label}</span>
+                        {tab.comingSoon && (
+                            <span className="text-[8px] font-bold uppercase leading-none mt-0.5 px-1 py-[1px] rounded-full bg-zinc-200/80 dark:bg-zinc-700/80 text-zinc-600 dark:text-zinc-300">
+                                Em breve
+                            </span>
+                        )}
                     </motion.button>
                 ))}
             </div>
