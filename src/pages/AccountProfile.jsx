@@ -1,7 +1,7 @@
 import React from 'react';
 import { User, Mail, Save, Shield, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import insforge from '../lib/insforge';
+import supabase from '../lib/supabase';
 
 const AccountProfile = () => {
     const { user, login, accessToken } = useAuth();
@@ -36,19 +36,23 @@ const AccountProfile = () => {
                 throw new Error('A imagem deve ter no máximo 5MB.');
             }
 
-            const { data: uploadData, error: uploadError } = await insforge.storage
-                .from('uploads')
-                .uploadAuto(file);
+            // Supabase: gerar path único para o arquivo
+            const fileExt = file.name.split('.').pop();
+            const filePath = `avatars/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-            if (uploadError || !uploadData?.key) {
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('uploads')
+                .upload(filePath, file);
+
+            if (uploadError || !uploadData?.path) {
                 throw new Error(uploadError?.message || 'Falha ao enviar imagem.');
             }
 
-            const uploadedUrl = insforge.storage
+            const { data: urlData } = supabase.storage
                 .from('uploads')
-                .getPublicUrl(uploadData.key);
+                .getPublicUrl(uploadData.path);
 
-            setAvatarUrl(uploadedUrl);
+            setAvatarUrl(urlData.publicUrl);
             setMessage('Imagem enviada com sucesso. Clique em "Salvar Perfil" para confirmar.');
         } catch (err) {
             setError(err?.message || 'Não foi possível enviar a imagem.');
@@ -64,23 +68,24 @@ const AccountProfile = () => {
         setError('');
 
         try {
-            const { error: profileError } = await insforge.auth.setProfile({
-                name: displayName,
-                displayName,
-                avatar: avatarUrl || null,
-                avatarUrl: avatarUrl || null,
+            // Supabase: updateUser() para salvar metadata do perfil
+            const { error: profileError } = await supabase.auth.updateUser({
+                data: {
+                    name: displayName,
+                    avatar_url: avatarUrl || null,
+                },
             });
 
             if (profileError) {
                 throw new Error(profileError.message || 'Falha ao salvar perfil.');
             }
 
-            const { data, error: sessionError } = await insforge.auth.getCurrentSession();
+            const { data, error: sessionError } = await supabase.auth.getSession();
             if (sessionError || !data?.session) {
                 throw new Error('Perfil salvo, mas não foi possível atualizar sua sessão.');
             }
 
-            login(data.session.user, accessToken || data.session.accessToken || null);
+            login(data.session.user, accessToken || data.session.access_token || null);
             setMessage('Perfil atualizado com sucesso.');
         } catch (err) {
             setError(err?.message || 'Erro ao atualizar perfil.');

@@ -1,11 +1,17 @@
 /**
  * Nutrixo AI Service Layer
- * Connects frontend to InsForge AI, Storage, and Database
- * 🛡️ Todas as chamadas de dados de saúde passam por validação JWT
  */
-import insforge from '../lib/insforge';
+import supabase from '../lib/supabase';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { parsePtBrNumber, parsePtBrReferenceRange } from '../lib/numberLocale';
 
-const AI_MODEL = 'openai/gpt-4o-mini';
+// Usa worker local empacotado pelo Vite (evita CDN, 404 e bloqueio de CSP para fake worker/blob).
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+const AI_MODEL = 'meta/llama-3.2-11b-vision-instruct';
+// Usamos o proxy do Vite (/nv-api) para evitar erro de CORS no browser
+const NVIDIA_API_URL = '/nv-api/v1/chat/completions';
 
 // ============================================================
 // 🛡️ SECURITY HELPERS
@@ -27,17 +33,18 @@ function validateFile(file) {
 }
 
 /**
- * 🛡️ Valida JWT e retorna o email do usuário autenticado.
+ * 🛡️ Valida JWT e retorna o email do usuário autenticado (sempre em lowercase).
  * Deve ser chamada no início de toda operação que leia ou escreva dados de saúde.
  */
 async function getAuthenticatedEmail() {
-    const { data, error } = await insforge.auth.getCurrentSession();
+    const { data, error } = await supabase.auth.getSession();
 
     if (error || !data?.session) {
         throw new Error('🔒 Sessão expirada. Faça login novamente.');
     }
 
-    if (data.session.expiresAt && new Date() > new Date(data.session.expiresAt)) {
+    // Supabase: expires_at é timestamp em segundos
+    if (data.session.expires_at && new Date() > new Date(data.session.expires_at * 1000)) {
         throw new Error('🔒 Sessão expirada. Faça login novamente.');
     }
 
@@ -46,78 +53,709 @@ async function getAuthenticatedEmail() {
         throw new Error('🔒 Usuário sem email identificado na sessão.');
     }
 
-    return email;
+    // Normalizamos para lowercase para evitar quebras de RLS por case-sensitivity
+    return email.toLowerCase();
 }
 
-function isTokenError(error) {
-    const message = `${error?.message || ''} ${error?.error_description || ''}`.toLowerCase();
-    return (
-        message.includes('invalid token') ||
-        message.includes('jwt') ||
-        message.includes('token') ||
-        error?.status === 401
-    );
+function normalizeAnalysisError(error, fallbackMessage) {
+    const raw = error?.message || fallbackMessage;
+    const lower = raw.toLowerCase();
+
+    if (lower.includes('invalid token') || lower.includes('sessão') || lower.includes('session')) {
+        return 'Sessão inválida ou expirada. Faça login novamente.';
+    }
+
+    if (lower.includes('api key') || lower.includes('unauthorized') || lower.includes('forbidden')) {
+        return 'Falha na autenticação com o serviço de IA. Verifique sua chave NVIDIA.';
+    }
+
+    // Erro de RLS no Supabase geralmente indica que a política bloqueou o insert/select
+    if (lower.includes('row-level security policy') || lower.includes('rls')) {
+        return '🔒 Erro de permissão: Sua conta não tem autorização para realizar esta operação no banco de dados.';
+    }
+
+    return raw;
 }
 
-function getCsrfTokenFromCookie() {
-    if (typeof document === 'undefined') return null;
-    const cookie = document.cookie
-        .split(';')
-        .map((part) => part.trim())
-        .find((part) => part.startsWith('insforge_csrf_token='));
-    if (!cookie) return null;
-    return decodeURIComponent(cookie.split('=')[1] || '');
+// ============================================================
+// 🤖 NVIDIA AI HELPER
+// ============================================================
+function getNvidiaApiKey() {
+    const key = import.meta.env.VITE_NVIDIA_API_KEY;
+    if (!key) {
+        throw new Error('⚠️ VITE_NVIDIA_API_KEY não configurada. Adicione ao .env');
+    }
+    return key;
 }
 
-async function refreshSessionSilently() {
-    const auth = insforge.auth;
-    const internalHttp = auth?.http;
-    const tokenManager = auth?.tokenManager;
+/**
+ * Chamada universal à NVIDIA API — substitui insforge.ai.chat.completions.create
+ */
+async function createChatCompletion({ model = AI_MODEL, messages, stream = false }) {
+    const apiKey = getNvidiaApiKey();
 
-    if (!internalHttp?.post) return false;
+    const body = {
+        model,
+        messages,
+        max_tokens: 4096,
+        temperature: 0.2, // Mais baixo para transcrição técnica fiel
+        top_p: 0.7,
+        stream: stream,
+    };
 
+    const response = await fetch(NVIDIA_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': stream ? 'text/event-stream' : 'application/json',
+        },
+        body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`NVIDIA API error (${response.status}): ${errorBody}`);
+    }
+
+    if (stream) {
+        return response; // Return raw response for streaming
+    }
+
+    return await response.json();
+}
+
+async function mapWithConcurrency(items, limit, worker) {
+    if (!Array.isArray(items) || items.length === 0) return [];
+    const concurrency = Math.max(1, Math.min(limit || 1, items.length));
+    const results = new Array(items.length);
+    let nextIndex = 0;
+
+    const runWorker = async () => {
+        while (true) {
+            const current = nextIndex;
+            nextIndex += 1;
+            if (current >= items.length) return;
+            results[current] = await worker(items[current], current);
+        }
+    };
+
+    await Promise.all(Array.from({ length: concurrency }, () => runWorker()));
+    return results;
+}
+
+// ============================================================
+// 📦 SUPABASE STORAGE HELPERS
+// ============================================================
+
+/**
+ * Upload file to Supabase Storage — substitui insforge.storage.from().uploadAuto()
+ */
+async function uploadFileToStorage(file, folder = 'files') {
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { data, error } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, file);
+
+    if (error || !data?.path) {
+        throw new Error(error?.message || 'Falha ao enviar arquivo para o storage.');
+    }
+
+    return data;
+}
+
+/**
+ * Gera URL pública de um arquivo no Supabase Storage
+ */
+function getPublicUrl(filePath) {
+    const { data } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(filePath);
+    return data.publicUrl;
+}
+
+// ============================================================
+// 📦 DATABASE HELPER
+// ============================================================
+
+/**
+ * Wrapper simples para operações de DB com tratamento de erro
+ */
+async function dbOperation(operation) {
+    const result = await operation();
+    if (result.error) {
+        throw new Error(result.error.message || 'Erro na operação de banco de dados');
+    }
+    return result;
+}
+
+// ============================================================
+// 🔄 JSON PARSING HELPER
+// ============================================================
+
+function parseAIJsonResponse(responseText) {
     try {
-        const csrfToken = getCsrfTokenFromCookie();
-        const response = await internalHttp.post('/api/auth/refresh', undefined, {
-            headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
-            credentials: 'include',
+        const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+        return JSON.parse(cleaned);
+    } catch {
+        try {
+            const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[1].trim());
+            } else {
+                const firstBrace = responseText.indexOf('{');
+                const lastBrace = responseText.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace > firstBrace) {
+                    return JSON.parse(responseText.substring(firstBrace, lastBrace + 1));
+                } else {
+                    console.error('[parseAIJsonResponse] Failed to parse:', responseText.substring(0, 500));
+                    return { raw: responseText };
+                }
+            }
+        } catch {
+            console.error('[parseAIJsonResponse] Final parse failure:', responseText.substring(0, 500));
+            return { raw: responseText };
+        }
+    }
+}
+
+function normalizeExamName(name = '') {
+    return String(name).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normalizeBiomarkerToken(value = '') {
+    return String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function mergeExamAnalyses(pageAnalyses = []) {
+    const mergedBiomarkers = [];
+    const seen = new Set();
+    const summaries = [];
+    const recommendations = [];
+    const alerts = [];
+
+    pageAnalyses.forEach((analysis) => {
+        const biomarkers = Array.isArray(analysis?.biomarkers) ? analysis.biomarkers : [];
+        biomarkers.forEach((b) => {
+            const key = `${normalizeExamName(b?.name)}|${String(b?.reference || '').trim()}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            mergedBiomarkers.push(b);
         });
 
-        if (!response?.accessToken) return false;
+        if (analysis?.summary) summaries.push(analysis.summary);
+        if (Array.isArray(analysis?.recommendations)) recommendations.push(...analysis.recommendations);
+        if (Array.isArray(analysis?.alerts)) alerts.push(...analysis.alerts);
+    });
 
-        tokenManager?.setMemoryMode?.();
-        tokenManager?.setAccessToken?.(response.accessToken);
-        tokenManager?.setUser?.(response.user);
-        internalHttp.setAuthToken?.(response.accessToken);
+    const uniq = (arr) => Array.from(new Set(arr.map((x) => String(x).trim()).filter(Boolean)));
+
+    return {
+        biomarkers: mergedBiomarkers,
+        summary: summaries.join(' ').trim(),
+        recommendations: uniq(recommendations),
+        alerts: uniq(alerts),
+    };
+}
+
+function parseLocaleNumber(value) {
+    return parsePtBrNumber(value);
+}
+
+function parseReferenceRange(value) {
+    return parsePtBrReferenceRange(value);
+}
+
+function isWithinRange(value, range) {
+    if (!range || value === null || Number.isNaN(value)) return false;
+    const [min, max] = range;
+    if (min !== null && max !== null) return value >= min && value <= max;
+    if (min !== null && max === null) return value >= min;
+    if (min === null && max !== null) return value <= max;
+    return false;
+}
+
+function normalizeBiomarkerStatus(status) {
+    const raw = String(status || '').toLowerCase();
+    return ['normal', 'low', 'high'].includes(raw) ? raw : 'unknown';
+}
+
+function computeStatusByReference(value, range, fallbackStatus = 'unknown') {
+    if (!range || value === null || Number.isNaN(value)) return fallbackStatus;
+    const [min, max] = range;
+    if (min !== null && max !== null) {
+        if (value >= min && value <= max) return 'normal';
+        return value < min ? 'low' : 'high';
+    }
+    if (min !== null && max === null) return value >= min ? 'normal' : 'low';
+    if (min === null && max !== null) return value <= max ? 'normal' : 'high';
+    return fallbackStatus;
+}
+
+function normalizeExamAnalysis(analysis) {
+    const biomarkers = Array.isArray(analysis?.biomarkers) ? analysis.biomarkers : [];
+
+    const normalizedBiomarkers = biomarkers.map((biomarker) => {
+        const fallbackStatus = normalizeBiomarkerStatus(biomarker?.status);
+        const range = parseReferenceRange(biomarker?.reference);
+        const parsedValue = parseLocaleNumber(biomarker?.value);
+
+        let normalizedValue = parsedValue;
+
+        // Corrige casos comuns de OCR/IA no padrão BR:
+        // "278.000" pode virar 278 se o ponto for interpretado como decimal.
+        // Se a referência usa milhar e o valor*1000 encaixa na faixa, aplicamos correção.
+        if (range && normalizedValue !== null && normalizedValue > 0 && normalizedValue < 1000) {
+            const referenceText = String(biomarker?.reference || '');
+            const hasThousandsInReference = /\d{1,3}[.,]\d{3}/.test(referenceText);
+            const scaled = normalizedValue * 1000;
+            if (hasThousandsInReference && !isWithinRange(normalizedValue, range) && isWithinRange(scaled, range)) {
+                normalizedValue = scaled;
+            }
+        }
+
+        const normalizedStatus = computeStatusByReference(normalizedValue, range, fallbackStatus);
+
+        return {
+            ...biomarker,
+            value: normalizedValue ?? biomarker?.value,
+            status: normalizedStatus,
+        };
+    });
+
+    return {
+        ...analysis,
+        biomarkers: normalizedBiomarkers,
+    };
+}
+
+function mergeMissingBiomarkersByName(primaryAnalysis, fallbackAnalysis) {
+    const primaryBiomarkers = Array.isArray(primaryAnalysis?.biomarkers) ? primaryAnalysis.biomarkers : [];
+    const fallbackBiomarkers = Array.isArray(fallbackAnalysis?.biomarkers) ? fallbackAnalysis.biomarkers : [];
+
+    if (!fallbackBiomarkers.length) return primaryAnalysis;
+
+    const existingNames = new Set(
+        primaryBiomarkers
+            .map((b) => normalizeExamName(b?.name))
+            .filter(Boolean)
+    );
+
+    const missing = fallbackBiomarkers.filter((b) => {
+        const name = normalizeExamName(b?.name);
+        if (!name || existingNames.has(name)) return false;
+        const val = parseLocaleNumber(b?.value);
+        return val !== null && !Number.isNaN(val);
+    });
+
+    if (!missing.length) return primaryAnalysis;
+
+    return {
+        ...primaryAnalysis,
+        biomarkers: [...primaryBiomarkers, ...missing],
+    };
+}
+
+async function extractPdfText(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pages = [];
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = (content?.items || [])
+            .map((item) => String(item.str || '').trim())
+            .filter(Boolean)
+            .join('\n');
+        pages.push(`--- Página ${i} ---\n${pageText}`);
+    }
+
+    return pages.join('\n\n');
+}
+
+const QUICK_AUDIT_BIOMARKERS = [
+    'hemacias',
+    'hemoglobina',
+    'hematocrito',
+    'leucocitos',
+    'plaquetas',
+    'glicose',
+    'colesterol total',
+    'hdl',
+    'ldl',
+    'triglicerideos',
+    'tgo',
+    'tgp',
+    'creatinina',
+    'ureia',
+    'tsh',
+    't4 livre',
+    'vitamina d',
+    'testosterona total',
+];
+
+function getMissingBiomarkersByQuickTextAudit(pdfText, analysis) {
+    const normalizedText = normalizeBiomarkerToken(pdfText);
+    if (!normalizedText) return [];
+
+    const foundInText = QUICK_AUDIT_BIOMARKERS.filter((name) => normalizedText.includes(name));
+    if (!foundInText.length) return [];
+
+    const extracted = new Set(
+        (analysis?.biomarkers || [])
+            .map((b) => normalizeBiomarkerToken(b?.name))
+            .filter(Boolean)
+    );
+
+    return foundInText.filter((name) => !extracted.has(name));
+}
+
+async function extractExamBiomarkersFromPdfTextFocused(pdfText, missingNames = []) {
+    if (!pdfText || !missingNames.length) return null;
+
+    const completion = await createChatCompletion({
+        model: AI_MODEL,
+        messages: [
+            {
+                role: 'system',
+                content: `Você é um extrator de biomarcadores. Extraia SOMENTE os exames solicitados se existirem no texto.
+
+Formato:
+{
+  "biomarkers": [
+    { "name": "TSH", "value": 2.1, "unit": "µUI/mL", "reference": "0,4 - 4,0 µUI/mL", "status": "normal" }
+  ]
+}
+
+REGRAS:
+- Não inventar dados.
+- Ponto pode ser milhar no texto BR. No JSON final, "value" numérico real.
+- Se não encontrar algum dos exames solicitados, simplesmente omita.
+- Retorne SOMENTE JSON.`
+            },
+            {
+                role: 'user',
+                content: `Exames prioritários faltantes: ${missingNames.join(', ')}\n\nTexto do PDF:\n${pdfText}`
+            }
+        ],
+    });
+
+    const responseText = completion.choices?.[0]?.message?.content || '';
+    return parseAIJsonResponse(responseText);
+}
+
+const QUICK_AUDIT_MEASUREMENTS = [
+    { label: 'peso', token: 'peso', keys: ['weight', 'peso'] },
+    { label: 'altura', token: 'altura', keys: ['height', 'altura'] },
+    { label: 'cintura', token: 'cintura', keys: ['waist', 'waist circumference', 'cintura'] },
+    { label: 'quadril', token: 'quadril', keys: ['hip', 'hips', 'quadril'] },
+    { label: 'gordura corporal', token: 'gordura corporal', keys: ['bodyfat', 'body fat', 'gordura corporal', 'pbf'] },
+    { label: 'massa muscular', token: 'massa muscular', keys: ['musclemass', 'muscle mass', 'massa muscular', 'smm'] },
+    { label: 'gordura visceral', token: 'gordura visceral', keys: ['visceralfat', 'visceral fat', 'gordura visceral'] },
+];
+
+const QUICK_AUDIT_PLAN_MEALS = [
+    { slot: 'Café da Manhã', tokens: ['cafe da manha', 'café da manhã', 'desjejum'] },
+    { slot: 'Almoço', tokens: ['almoco', 'almoço'] },
+    { slot: 'Lanche', tokens: ['lanche'] },
+    { slot: 'Jantar', tokens: ['jantar'] },
+    { slot: 'Ceia', tokens: ['ceia'] },
+];
+
+function getMissingMeasurementsByQuickTextAudit(pdfText, analysis) {
+    const normalizedText = normalizeBiomarkerToken(pdfText);
+    if (!normalizedText) return [];
+
+    const extractedKeys = new Set(
+        Object.keys(analysis?.measurements || {}).map((key) => normalizeBiomarkerToken(key))
+    );
+
+    return QUICK_AUDIT_MEASUREMENTS.filter((signal) => {
+        const textHasSignal = normalizedText.includes(normalizeBiomarkerToken(signal.token));
+        if (!textHasSignal) return false;
+        const hasExtracted = signal.keys.some((key) => extractedKeys.has(normalizeBiomarkerToken(key)));
+        return !hasExtracted;
+    }).map((signal) => signal.label);
+}
+
+async function extractMeasurementsFromPdfTextFocused(pdfText, missingLabels = []) {
+    if (!pdfText || !missingLabels.length) return null;
+
+    const completion = await createChatCompletion({
+        model: AI_MODEL,
+        messages: [
+            {
+                role: 'system',
+                content: `Você extrai medidas corporais de texto OCR.
+
+Retorne APENAS JSON no formato:
+{
+  "bmi": { "value": 28.4, "classification": "Sobrepeso" },
+  "measurements": {
+    "weight": { "value": 94.2, "unit": "kg" }
+  }
+}
+
+REGRAS:
+- Extraia SOMENTE os itens solicitados.
+- Não invente dados.
+- Use valor numérico correto no padrão pt-BR convertido para número.
+- Se não encontrar um item solicitado, omita.`
+            },
+            {
+                role: 'user',
+                content: `Itens faltantes prioritários: ${missingLabels.join(', ')}\n\nTexto do PDF:\n${pdfText}`
+            }
+        ],
+    });
+
+    const responseText = completion.choices?.[0]?.message?.content || '';
+    return parseAIJsonResponse(responseText);
+}
+
+function getMissingPlanByQuickTextAudit(pdfText, analysis) {
+    const normalizedText = normalizeBiomarkerToken(pdfText);
+    if (!normalizedText) return { missingMeals: [], missingMacros: false };
+
+    const extractedMealText = (analysis?.meals || [])
+        .map((meal) => normalizeBiomarkerToken(`${meal?.time || ''} ${meal?.name || ''}`))
+        .join(' ');
+
+    const missingMeals = QUICK_AUDIT_PLAN_MEALS.filter((slotDef) => {
+        const appearsInText = slotDef.tokens.some((token) => normalizedText.includes(normalizeBiomarkerToken(token)));
+        if (!appearsInText) return false;
+        const alreadyExtracted = slotDef.tokens.some((token) => extractedMealText.includes(normalizeBiomarkerToken(token)));
+        return !alreadyExtracted;
+    }).map((slotDef) => slotDef.slot);
+
+    const hasMacroHints = ['kcal', 'calorias', 'proteina', 'proteína', 'carboidrato', 'carboidratos', 'gordura', 'gorduras']
+        .some((token) => normalizedText.includes(normalizeBiomarkerToken(token)));
+    const hasDailyMacros = analysis?.dailyMacros && Object.keys(analysis.dailyMacros).length > 0;
+
+    return {
+        missingMeals,
+        missingMacros: hasMacroHints && !hasDailyMacros,
+    };
+}
+
+async function extractNutritionPlanFromPdfTextFocused(pdfText, missingMeals = [], includeMacros = false) {
+    if (!pdfText || (!missingMeals.length && !includeMacros)) return null;
+
+    const completion = await createChatCompletion({
+        model: AI_MODEL,
+        messages: [
+            {
+                role: 'system',
+                content: `Você extrai plano alimentar de texto OCR.
+
+Retorne APENAS JSON no formato:
+{
+  "dailyMacros": { "calories": 2000, "protein": 120, "carbs": 250, "fats": 65 },
+  "meals": [{ "time": "Almoço", "name": "Nome", "calories": 400, "protein": 25, "carbs": 50, "fats": 12, "ingredients": [] }]
+}
+
+REGRAS:
+- Extraia SOMENTE refeições solicitadas e/ou macros diários solicitados.
+- Não invente dados.
+- Se não encontrar algo, omita.
+- Responda somente JSON.`
+            },
+            {
+                role: 'user',
+                content: `Refeições faltantes: ${missingMeals.join(', ') || 'nenhuma'}\nExtrair macros diários: ${includeMacros ? 'sim' : 'não'}\n\nTexto do PDF:\n${pdfText}`
+            }
+        ],
+    });
+
+    const responseText = completion.choices?.[0]?.message?.content || '';
+    return parseAIJsonResponse(responseText);
+}
+
+function mergeMeasurementsAnalyses(pageAnalyses = []) {
+    const merged = {
+        bmi: null,
+        measurements: {},
+        summary: '',
+        recommendations: [],
+    };
+
+    pageAnalyses.forEach((analysis) => {
+        if (!merged.bmi && analysis?.bmi) {
+            merged.bmi = analysis.bmi;
+        }
+
+        const currentMeasurements = analysis?.measurements || {};
+        Object.keys(currentMeasurements).forEach((key) => {
+            if (!merged.measurements[key]) {
+                merged.measurements[key] = currentMeasurements[key];
+            }
+        });
+
+        if (analysis?.summary) {
+            merged.summary = `${merged.summary} ${analysis.summary}`.trim();
+        }
+
+        if (Array.isArray(analysis?.recommendations)) {
+            merged.recommendations.push(...analysis.recommendations);
+        }
+    });
+
+    merged.recommendations = Array.from(new Set(merged.recommendations.map((x) => String(x).trim()).filter(Boolean)));
+    return merged;
+}
+
+function mergeMeasurementsAudit(primaryAnalysis, auditAnalysis) {
+    if (!auditAnalysis) return primaryAnalysis;
+    const merged = mergeMeasurementsAnalyses([primaryAnalysis, auditAnalysis]);
+    return {
+        ...primaryAnalysis,
+        bmi: primaryAnalysis?.bmi || merged?.bmi || null,
+        measurements: merged?.measurements || primaryAnalysis?.measurements || {},
+    };
+}
+
+function mergeNutritionPlanAnalyses(pageAnalyses = []) {
+    const merged = {
+        dailyMacros: {},
+        meals: [],
+        summary: '',
+        suggestions: [],
+    };
+
+    pageAnalyses.forEach((analysis) => {
+        if (analysis?.dailyMacros && Object.keys(merged.dailyMacros).length === 0) {
+            merged.dailyMacros = analysis.dailyMacros;
+        }
+
+        if (Array.isArray(analysis?.meals)) {
+            merged.meals.push(...analysis.meals);
+        }
+
+        if (analysis?.summary) {
+            merged.summary = `${merged.summary} ${analysis.summary}`.trim();
+        }
+
+        if (Array.isArray(analysis?.suggestions)) {
+            merged.suggestions.push(...analysis.suggestions);
+        }
+    });
+
+    merged.suggestions = Array.from(new Set(merged.suggestions.map((x) => String(x).trim()).filter(Boolean)));
+    return merged;
+}
+
+function mergeNutritionPlanAudit(primaryAnalysis, auditAnalysis) {
+    if (!auditAnalysis) return primaryAnalysis;
+    const primaryMeals = Array.isArray(primaryAnalysis?.meals) ? primaryAnalysis.meals : [];
+    const auditMeals = Array.isArray(auditAnalysis?.meals) ? auditAnalysis.meals : [];
+
+    const seen = new Set(
+        primaryMeals.map((meal) => normalizeBiomarkerToken(`${meal?.time || ''}|${meal?.name || ''}`))
+    );
+
+    const missingMeals = auditMeals.filter((meal) => {
+        const key = normalizeBiomarkerToken(`${meal?.time || ''}|${meal?.name || ''}`);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
         return true;
-    } catch {
-        return false;
+    });
+
+    const hasPrimaryMacros = primaryAnalysis?.dailyMacros && Object.keys(primaryAnalysis.dailyMacros).length > 0;
+    const hasAuditMacros = auditAnalysis?.dailyMacros && Object.keys(auditAnalysis.dailyMacros).length > 0;
+
+    return {
+        ...primaryAnalysis,
+        dailyMacros: hasPrimaryMacros ? primaryAnalysis.dailyMacros : (hasAuditMacros ? auditAnalysis.dailyMacros : {}),
+        meals: [...primaryMeals, ...missingMeals],
+    };
+}
+
+/**
+ * Converte um arquivo PDF em uma lista de strings Base64 (uma para cada página)
+ */
+async function convertPdfToImages(file) {
+    console.log('📄 [DEBUG] Iniciando conversão de PDF para Imagem...');
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const numPages = pdf.numPages;
+        const images = [];
+
+        for (let i = 1; i <= numPages; i++) {
+            console.log(`📸 [DEBUG] Renderizando página ${i} de ${numPages}...`);
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 2.0 }); // 2x para melhor OCR
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: context, viewport }).promise;
+            images.push(canvas.toDataURL('image/jpeg', 0.8));
+        }
+
+        return images;
+    } catch (err) {
+        console.error('❌ [PDF_CONVERSION_ERROR]:', err);
+        throw new Error(`Falha técnica ao processar PDF: ${err.message}. Tente usar uma foto.`);
     }
 }
 
-async function runWithTokenRetry(operation) {
+async function markAnalysisAsFailed(table, id, userEmail, message) {
     try {
-        return await operation();
-    } catch (error) {
-        if (!isTokenError(error)) throw error;
-
-        const refreshed = await refreshSessionSilently();
-        if (!refreshed) {
-            const { data } = await insforge.auth.getCurrentSession();
-            if (!data?.session) {
-                throw new Error('🔒 Sessão expirada. Faça login novamente.');
-            }
-        }
-
-        try {
-            return await operation();
-        } catch (retryError) {
-            if (isTokenError(retryError)) {
-                throw new Error('🔒 Sessão inválida. Faça logout e login novamente.');
-            }
-            throw retryError;
-        }
+        await supabase
+            .from(table)
+            .update({
+                status: 'failed',
+                analysis: { error: message },
+            })
+            .eq('id', id)
+            .eq('user_email', userEmail);
+    } catch {
+        // Não interrompe o fluxo principal se falhar ao marcar erro.
     }
+}
+
+async function generateFoodAnalysisFromText(text, mealType) {
+    const completion = await createChatCompletion({
+        model: AI_MODEL,
+        messages: [
+            {
+                role: 'system',
+                content: `Você é um nutricionista. O usuário descreve o que comeu em texto livre. Identifique os alimentos e estime os valores nutricionais. Retorne JSON:
+{
+  "foods": [
+    { "name": "Frango grelhado", "portion": "150g", "calories": 248, "protein": 46, "carbs": 0, "fats": 5 }
+  ],
+  "totalCalories": 500,
+  "totalProtein": 52,
+  "totalCarbs": 60,
+  "totalFats": 12,
+  "description": "Descrição resumida da refeição",
+  "healthScore": 8,
+  "tips": "Dica nutricional"
+}
+Retorne APENAS o JSON.`
+            },
+            {
+                role: 'user',
+                content: `Para o ${mealType}, eu comi: ${text}`,
+            },
+        ],
+    });
+
+    const responseText = completion.choices[0].message.content;
+    return parseAIJsonResponse(responseText);
 }
 
 // ============================================================
@@ -127,95 +765,134 @@ export async function analyzeExam(file) {
     validateFile(file);
     const userEmail = await getAuthenticatedEmail();
 
-    // 1. Upload PDF to storage
-    const { data: uploadData, error: uploadError } = await insforge.storage
-        .from('uploads')
-        .uploadAuto(file);
+    const uploadData = await uploadFileToStorage(file, 'exams');
+    const fileUrl = getPublicUrl(uploadData.path);
 
-    if (uploadError) throw new Error('Erro ao enviar arquivo: ' + uploadError.message);
+    // 2. Prepare images for AI (Convert if PDF, use directly if image)
+    let images = [];
+    if (file.type === 'application/pdf') {
+        images = await convertPdfToImages(file);
+    } else {
+        const singleBase64 = await fileToBase64(file);
+        images = [singleBase64];
+    }
 
-    const fileUrl = insforge.storage
-        .from('uploads')
-        .getPublicUrl(uploadData.key);
+    const { data: examRecord } = await dbOperation(() =>
+        supabase
+            .from('nutrixo_exams')
+            .insert([{
+                user_email: userEmail.trim().toLowerCase(),
+                file_name: file.name,
+                file_url: fileUrl,
+                file_key: uploadData.path,
+                status: 'analyzing',
+            }])
+            .select()
+            .single()
+    );
 
-    // Convert file to base64 for AI analysis (bypass storage URL issues)
-    const fileBase64 = await fileToBase64(file);
+    try {
+        // 3. Analyze with AI via NVIDIA API
+        console.log('🔍 [DEBUG] Model:', AI_MODEL);
+        console.log('🔍 [DEBUG] Enviando', images.length, 'página(s) para análise (1 por requisição)...');
 
-    console.log('DEBUG: fileUrl (DB):', fileUrl);
-
-    // 2. Create pending record in DB — associado ao user autenticado
-    const { data: examRecord, error: dbError } = await insforge.database
-        .from('nutrixo_exams')
-        .insert([{
-            user_email: userEmail,
-            file_name: file.name,
-            file_url: fileUrl,
-            file_key: uploadData.key,
-            status: 'analyzing',
-        }])
-        .select()
-        .single();
-
-    if (dbError) throw new Error('Erro ao salvar registro: ' + dbError.message);
-
-    // 3. Analyze with AI (PDF parser)
-    const completion = await insforge.ai.chat.completions.create({
-        model: AI_MODEL,
-        messages: [
+        const messages = [
             {
                 role: 'system',
-                content: `Você é um assistente de saúde que analisa exames de sangue. Analise o PDF do exame e retorne um JSON válido com esta estrutura exata:
+                content: `Você é um transcritor de exames laboratoriais de elite. Sua ÚNICA tarefa é copiar os dados EXATAMENTE como estão nas tabelas do documento.
+
+REGRA #1 — SOMENTE DADOS VISÍVEIS:
+- Extraia APENAS as linhas que aparecem nas TABELAS do documento
+- Cada LINHA de tabela com coluna "Exame", "Resultado" e "Valor de Referência" = 1 biomarcador
+- NÃO calcule, NÃO derive, NÃO infira nenhum dado que não esteja EXPLICITAMENTE escrito
+- Se um exame NÃO tem uma linha na tabela com resultado numérico, NÃO o inclua
+
+REGRA #2 — PROIBIDO INVENTAR:
+- NÃO adicione exames que não existem nas tabelas
+- Se o documento tem 10 linhas de resultado, retorne EXATAMENTE 10 biomarcadores
+
+REGRA #3 — NÚMEROS BRASILEIROS:
+- No Brasil, o PONTO é separador de milhar: "7.200" = 7200
+- A VÍRGULA é separador decimal: "4,92" = 4.92
+- No JSON final, envie o valor numérico real sem separador de milhar: ex. "278.000" deve virar 278000 (NUNCA 278)
+
+Formato de resposta JSON:
 {
   "biomarkers": [
-    {
-      "name": "Nome do biomarcador",
-      "value": 123,
-      "unit": "mg/dL",
-      "reference": "100-200",
-      "status": "normal" | "low" | "high"
-    }
+    { "name": "Hemácias", "value": 4.92, "unit": "milhões/mm³", "reference": "4,5 – 5,9 milhões/mm³", "status": "normal" }
   ],
-  "summary": "Resumo geral dos resultados em português",
-  "recommendations": ["Recomendação 1", "Recomendação 2"],
-  "alerts": ["Alerta sobre valores críticos, se houver"]
+  "summary": "Resumo geral em português",
+  "recommendations": ["Recomendação 1"],
+  "alerts": ["Alerta se houver valor fora da faixa"]
 }
-Retorne APENAS o JSON, sem markdown, sem texto adicional.`
+
+Status: "normal" se dentro da referência, "low" se abaixo, "high" se acima.
+Retorne SOMENTE o JSON. Sem markdown, sem backticks.`
             },
-            {
-                role: 'user',
-                content: [
-                    { type: 'text', text: 'Analise este exame de sangue e retorne os resultados em JSON:' },
-                    {
-                        type: 'file',
-                        file: {
-                            filename: file.name,
-                            file_data: fileBase64,
+        ];
+
+        const pageAnalyses = await mapWithConcurrency(images, 2, async (image, index) => {
+            const pageMessages = [
+                ...messages,
+                {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Transcreva SOMENTE a página ${index + 1}/${images.length} deste exame. NÃO invente dados.`,
                         },
-                    },
-                ],
-            },
-        ],
-        fileParser: { enabled: true },
-    });
+                        {
+                            type: 'image_url',
+                            image_url: { url: image },
+                        },
+                    ],
+                },
+            ];
 
-    const responseText = completion.choices[0].message.content;
-    let analysis;
-    try {
-        analysis = JSON.parse(responseText);
-    } catch {
-        // Try to extract JSON from markdown code blocks
-        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        analysis = jsonMatch ? JSON.parse(jsonMatch[1]) : { raw: responseText };
+            const completion = await createChatCompletion({
+                model: AI_MODEL,
+                messages: pageMessages,
+            });
+            const responseText = completion.choices[0].message.content;
+            return parseAIJsonResponse(responseText);
+        });
+
+        let analysis = normalizeExamAnalysis(mergeExamAnalyses(pageAnalyses));
+
+        // Camada de segurança para PDFs:
+        // auditoria rápida por texto e IA focada somente quando houver indício de biomarcador faltante.
+        if (file.type === 'application/pdf') {
+            try {
+                const pdfText = await extractPdfText(file);
+                const missingByAudit = getMissingBiomarkersByQuickTextAudit(pdfText, analysis);
+
+                if (missingByAudit.length > 0) {
+                    const focusedAudit = await extractExamBiomarkersFromPdfTextFocused(pdfText, missingByAudit);
+                    if (Array.isArray(focusedAudit?.biomarkers) && focusedAudit.biomarkers.length > 0) {
+                        analysis = normalizeExamAnalysis(mergeMissingBiomarkersByName(analysis, focusedAudit));
+                    }
+                }
+            } catch (auditErr) {
+                // Não quebra a análise principal se a auditoria textual falhar.
+                console.warn('[EXAM_TEXT_AUDIT] Falhou auditoria de complementação:', auditErr?.message || auditErr);
+            }
+        }
+
+        console.log('🔍 [DEBUG] Análise parseada:', analysis);
+
+        // 4. Update DB with results
+        await dbOperation(() => supabase
+            .from('nutrixo_exams')
+            .update({ analysis, status: 'completed' })
+            .eq('id', examRecord.id)
+            .eq('user_email', userEmail));
+
+        return { id: examRecord.id, analysis };
+    } catch (error) {
+        const normalizedError = normalizeAnalysisError(error, 'Erro ao analisar o exame.');
+        await markAnalysisAsFailed('nutrixo_exams', examRecord.id, userEmail, normalizedError);
+        throw new Error(normalizedError);
     }
-
-    // 4. Update DB with results
-    await insforge.database
-        .from('nutrixo_exams')
-        .update({ analysis, status: 'completed' })
-        .eq('id', examRecord.id)
-        .eq('user_email', userEmail);
-
-    return { id: examRecord.id, analysis };
 }
 
 // ============================================================
@@ -225,36 +902,31 @@ export async function analyzeMeasurements(file) {
     validateFile(file);
     const userEmail = await getAuthenticatedEmail();
 
-    const { data: uploadData, error: uploadError } = await insforge.storage
-        .from('uploads')
-        .uploadAuto(file);
+    const uploadData = await uploadFileToStorage(file, 'measurements');
+    const fileUrl = getPublicUrl(uploadData.path);
+    let images = [];
+    if (file.type === 'application/pdf') {
+        images = await convertPdfToImages(file);
+    } else {
+        images = [await fileToBase64(file)];
+    }
 
-    if (uploadError) throw new Error('Erro ao enviar arquivo: ' + uploadError.message);
+    const { data: record } = await dbOperation(() =>
+        supabase
+            .from('nutrixo_measurements')
+            .insert([{
+                user_email: userEmail,
+                file_name: file.name,
+                file_url: fileUrl,
+                file_key: uploadData.path,
+                status: 'analyzing',
+            }])
+            .select()
+            .single()
+    );
 
-    const fileUrl = insforge.storage
-        .from('uploads')
-        .getPublicUrl(uploadData.key);
-
-    // Convert file to base64 for AI analysis
-    const fileBase64 = await fileToBase64(file);
-
-    const { data: record, error: dbError } = await insforge.database
-        .from('nutrixo_measurements')
-        .insert([{
-            user_email: userEmail,
-            file_name: file.name,
-            file_url: fileUrl,
-            file_key: uploadData.key,
-            status: 'analyzing',
-        }])
-        .select()
-        .single();
-
-    if (dbError) throw new Error('Erro ao salvar registro: ' + dbError.message);
-
-    const completion = await insforge.ai.chat.completions.create({
-        model: AI_MODEL,
-        messages: [
+    try {
+        const messages = [
             {
                 role: 'system',
                 content: `Você é um robô de extração de dados antropométricos. Analise o PDF e gere um JSON RÍGIDO.
@@ -284,36 +956,58 @@ REGRAS:
 5. Se o dado existir, ele DEVE estar no objeto "measurements".
 6. Retorne APENAS o JSON válido.`
             },
-            {
-                role: 'user',
-                content: [
-                    { type: 'text', text: 'Analise estas medidas corporais e retorne os resultados em JSON:' },
-                    {
-                        type: 'file',
-                        file: { filename: file.name, file_data: fileBase64 },
-                    },
-                ],
-            },
-        ],
-        fileParser: { enabled: true },
-    });
+        ];
 
-    const responseText = completion.choices[0].message.content;
-    let analysis;
-    try {
-        analysis = JSON.parse(responseText);
-    } catch {
-        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        analysis = jsonMatch ? JSON.parse(jsonMatch[1]) : { raw: responseText };
+        const pageAnalyses = await mapWithConcurrency(images, 2, async (image, index) => {
+            const pageMessages = [
+                ...messages,
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: `Analise a página ${index + 1}/${images.length} e retorne o JSON no formato solicitado.` },
+                        {
+                            type: 'image_url',
+                            image_url: { url: image },
+                        },
+                    ],
+                },
+            ];
+
+            const completion = await createChatCompletion({
+                model: AI_MODEL,
+                messages: pageMessages,
+            });
+
+            const responseText = completion.choices[0].message.content;
+            return parseAIJsonResponse(responseText);
+        });
+        let analysis = mergeMeasurementsAnalyses(pageAnalyses);
+
+        if (file.type === 'application/pdf') {
+            try {
+                const pdfText = await extractPdfText(file);
+                const missingByAudit = getMissingMeasurementsByQuickTextAudit(pdfText, analysis);
+                if (missingByAudit.length > 0) {
+                    const focusedAudit = await extractMeasurementsFromPdfTextFocused(pdfText, missingByAudit);
+                    analysis = mergeMeasurementsAudit(analysis, focusedAudit);
+                }
+            } catch (auditErr) {
+                console.warn('[MEASUREMENTS_TEXT_AUDIT] Falhou auditoria de complementação:', auditErr?.message || auditErr);
+            }
+        }
+
+        await dbOperation(() => supabase
+            .from('nutrixo_measurements')
+            .update({ analysis, status: 'completed' })
+            .eq('id', record.id)
+            .eq('user_email', userEmail));
+
+        return { id: record.id, analysis };
+    } catch (error) {
+        const normalizedError = normalizeAnalysisError(error, 'Erro ao analisar as medidas.');
+        await markAnalysisAsFailed('nutrixo_measurements', record.id, userEmail, normalizedError);
+        throw new Error(normalizedError);
     }
-
-    await insforge.database
-        .from('nutrixo_measurements')
-        .update({ analysis, status: 'completed' })
-        .eq('id', record.id)
-        .eq('user_email', userEmail);
-
-    return { id: record.id, analysis };
 }
 
 // ============================================================
@@ -323,36 +1017,31 @@ export async function analyzeNutritionPlan(file) {
     validateFile(file);
     const userEmail = await getAuthenticatedEmail();
 
-    const { data: uploadData, error: uploadError } = await insforge.storage
-        .from('uploads')
-        .uploadAuto(file);
+    const uploadData = await uploadFileToStorage(file, 'plans');
+    const fileUrl = getPublicUrl(uploadData.path);
+    let images = [];
+    if (file.type === 'application/pdf') {
+        images = await convertPdfToImages(file);
+    } else {
+        images = [await fileToBase64(file)];
+    }
 
-    if (uploadError) throw new Error('Erro ao enviar arquivo: ' + uploadError.message);
+    const { data: record } = await dbOperation(() =>
+        supabase
+            .from('nutrixo_plans')
+            .insert([{
+                user_email: userEmail,
+                file_name: file.name,
+                file_url: fileUrl,
+                file_key: uploadData.path,
+                status: 'analyzing',
+            }])
+            .select()
+            .single()
+    );
 
-    const fileUrl = insforge.storage
-        .from('uploads')
-        .getPublicUrl(uploadData.key);
-
-    // Convert file to base64 for AI analysis
-    const fileBase64 = await fileToBase64(file);
-
-    const { data: record, error: dbError } = await insforge.database
-        .from('nutrixo_plans')
-        .insert([{
-            user_email: userEmail,
-            file_name: file.name,
-            file_url: fileUrl,
-            file_key: uploadData.key,
-            status: 'analyzing',
-        }])
-        .select()
-        .single();
-
-    if (dbError) throw new Error('Erro ao salvar registro: ' + dbError.message);
-
-    const completion = await insforge.ai.chat.completions.create({
-        model: AI_MODEL,
-        messages: [
+    try {
+        const messages = [
             {
                 role: 'system',
                 content: `Você é um nutricionista. Analise o plano alimentar do PDF e retorne um JSON:
@@ -379,36 +1068,58 @@ export async function analyzeNutritionPlan(file) {
 }
 Retorne APENAS o JSON.`
             },
-            {
-                role: 'user',
-                content: [
-                    { type: 'text', text: 'Analise este plano alimentar e extraia as refeições e macros:' },
-                    {
-                        type: 'file',
-                        file: { filename: file.name, file_data: fileBase64 },
-                    },
-                ],
-            },
-        ],
-        fileParser: { enabled: true },
-    });
+        ];
 
-    const responseText = completion.choices[0].message.content;
-    let analysis;
-    try {
-        analysis = JSON.parse(responseText);
-    } catch {
-        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        analysis = jsonMatch ? JSON.parse(jsonMatch[1]) : { raw: responseText };
+        const pageAnalyses = await mapWithConcurrency(images, 2, async (image, index) => {
+            const pageMessages = [
+                ...messages,
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: `Analise a página ${index + 1}/${images.length} do plano alimentar e retorne o JSON solicitado.` },
+                        {
+                            type: 'image_url',
+                            image_url: { url: image },
+                        },
+                    ],
+                },
+            ];
+
+            const completion = await createChatCompletion({
+                model: AI_MODEL,
+                messages: pageMessages,
+            });
+
+            const responseText = completion.choices[0].message.content;
+            return parseAIJsonResponse(responseText);
+        });
+        let analysis = mergeNutritionPlanAnalyses(pageAnalyses);
+
+        if (file.type === 'application/pdf') {
+            try {
+                const pdfText = await extractPdfText(file);
+                const { missingMeals, missingMacros } = getMissingPlanByQuickTextAudit(pdfText, analysis);
+                if (missingMeals.length > 0 || missingMacros) {
+                    const focusedAudit = await extractNutritionPlanFromPdfTextFocused(pdfText, missingMeals, missingMacros);
+                    analysis = mergeNutritionPlanAudit(analysis, focusedAudit);
+                }
+            } catch (auditErr) {
+                console.warn('[PLAN_TEXT_AUDIT] Falhou auditoria de complementação:', auditErr?.message || auditErr);
+            }
+        }
+
+        await dbOperation(() => supabase
+            .from('nutrixo_plans')
+            .update({ analysis, status: 'completed' })
+            .eq('id', record.id)
+            .eq('user_email', userEmail));
+
+        return { id: record.id, analysis };
+    } catch (error) {
+        const normalizedError = normalizeAnalysisError(error, 'Erro ao analisar o plano alimentar.');
+        await markAnalysisAsFailed('nutrixo_plans', record.id, userEmail, normalizedError);
+        throw new Error(normalizedError);
     }
-
-    await insforge.database
-        .from('nutrixo_plans')
-        .update({ analysis, status: 'completed' })
-        .eq('id', record.id)
-        .eq('user_email', userEmail);
-
-    return { id: record.id, analysis };
 }
 
 // ============================================================
@@ -422,17 +1133,10 @@ export async function analyzeFoodPhoto(file, mealType) {
     const base64 = await fileToBase64(file);
 
     // Upload photo to storage
-    const { data: uploadData, error: uploadError } = await insforge.storage
-        .from('uploads')
-        .uploadAuto(file);
+    const uploadData = await uploadFileToStorage(file, 'meals');
+    const fileUrl = getPublicUrl(uploadData.path);
 
-    if (uploadError) throw new Error('Erro ao enviar foto: ' + uploadError.message);
-
-    const fileUrl = insforge.storage
-        .from('uploads')
-        .getPublicUrl(uploadData.key);
-
-    const completion = await insforge.ai.chat.completions.create({
+    const completion = await createChatCompletion({
         model: AI_MODEL,
         messages: [
             {
@@ -466,16 +1170,10 @@ Retorne APENAS o JSON.`
     });
 
     const responseText = completion.choices[0].message.content;
-    let analysis;
-    try {
-        analysis = JSON.parse(responseText);
-    } catch {
-        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        analysis = jsonMatch ? JSON.parse(jsonMatch[1]) : { raw: responseText };
-    }
+    const analysis = parseAIJsonResponse(responseText);
 
-    // Save meal to DB — associado ao user autenticado
-    const { data: meal } = await insforge.database
+    // Save meal to DB
+    const { data: meal } = await dbOperation(() => supabase
         .from('nutrixo_meals')
         .insert([{
             user_email: userEmail,
@@ -483,7 +1181,7 @@ Retorne APENAS o JSON.`
             input_method: 'photo',
             description: analysis.description || 'Refeição analisada por foto',
             image_url: fileUrl,
-            image_key: uploadData.key,
+            image_key: uploadData.path,
             analysis,
             calories: analysis.totalCalories || 0,
             protein: analysis.totalProtein || 0,
@@ -491,7 +1189,7 @@ Retorne APENAS o JSON.`
             fats: analysis.totalFats || 0,
         }])
         .select()
-        .single();
+        .single());
 
     return { id: meal?.id, analysis };
 }
@@ -503,44 +1201,10 @@ export async function analyzeFoodDescription(text, mealType, options = {}) {
     const userEmail = await getAuthenticatedEmail();
     const { inputMethod = 'voice' } = options;
 
-    const completion = await runWithTokenRetry(() => insforge.ai.chat.completions.create({
-        model: AI_MODEL,
-        messages: [
-            {
-                role: 'system',
-                content: `Você é um nutricionista. O usuário descreve o que comeu em texto livre. Identifique os alimentos e estime os valores nutricionais. Retorne JSON:
-{
-  "foods": [
-    { "name": "Frango grelhado", "portion": "150g", "calories": 248, "protein": 46, "carbs": 0, "fats": 5 }
-  ],
-  "totalCalories": 500,
-  "totalProtein": 52,
-  "totalCarbs": 60,
-  "totalFats": 12,
-  "description": "Descrição resumida da refeição",
-  "healthScore": 8,
-  "tips": "Dica nutricional"
-}
-Retorne APENAS o JSON.`
-            },
-            {
-                role: 'user',
-                content: `Para o ${mealType}, eu comi: ${text}`,
-            },
-        ],
-    }));
+    const analysis = await generateFoodAnalysisFromText(text, mealType);
 
-    const responseText = completion.choices[0].message.content;
-    let analysis;
-    try {
-        analysis = JSON.parse(responseText);
-    } catch {
-        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        analysis = jsonMatch ? JSON.parse(jsonMatch[1]) : { raw: responseText };
-    }
-
-    // Save meal to DB — associado ao user autenticado
-    const { data: meal, error: mealInsertError } = await runWithTokenRetry(() => insforge.database
+    // Save meal to DB
+    const { data: meal } = await dbOperation(() => supabase
         .from('nutrixo_meals')
         .insert([{
             user_email: userEmail,
@@ -556,11 +1220,90 @@ Retorne APENAS o JSON.`
         .select()
         .single());
 
-    if (mealInsertError) {
-        throw new Error(mealInsertError.message || 'Erro ao salvar refeição.');
-    }
-
     return { id: meal?.id, analysis };
+}
+
+export async function getMealsByDateRange(startDate, endDate) {
+    const userEmail = await getAuthenticatedEmail();
+    const dateStart = `${startDate}T00:00:00`;
+    const dateEnd = `${endDate}T23:59:59`;
+
+    const { data, error } = await supabase
+        .from('nutrixo_meals')
+        .select('*')
+        .eq('user_email', userEmail)
+        .gte('created_at', dateStart)
+        .lte('created_at', dateEnd)
+        .order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message || 'Erro ao carregar histórico de refeições.');
+    return data || [];
+}
+
+export async function updateMealEntry(mealId, payload) {
+    const userEmail = await getAuthenticatedEmail();
+    const { data, error } = await supabase
+        .from('nutrixo_meals')
+        .update(payload)
+        .eq('id', mealId)
+        .eq('user_email', userEmail)
+        .select()
+        .single();
+
+    if (error) throw new Error(error.message || 'Erro ao atualizar refeição.');
+    return data;
+}
+
+export async function deleteMealEntry(mealId) {
+    const userEmail = await getAuthenticatedEmail();
+    const { error } = await supabase
+        .from('nutrixo_meals')
+        .delete()
+        .eq('id', mealId)
+        .eq('user_email', userEmail);
+
+    if (error) throw new Error(error.message || 'Erro ao excluir refeição.');
+    return true;
+}
+
+export async function duplicateMealEntry(meal) {
+    const userEmail = await getAuthenticatedEmail();
+    const payload = {
+        user_email: userEmail,
+        meal_type: meal.meal_type,
+        input_method: meal.input_method || 'manual',
+        description: meal.description || meal.analysis?.description || 'Refeição duplicada',
+        analysis: meal.analysis || null,
+        calories: meal.calories || meal.analysis?.totalCalories || 0,
+        protein: meal.protein || meal.analysis?.totalProtein || 0,
+        carbs: meal.carbs || meal.analysis?.totalCarbs || 0,
+        fats: meal.fats || meal.analysis?.totalFats || 0,
+        image_url: meal.image_url || null,
+        image_key: meal.image_key || null,
+    };
+
+    const { data, error } = await supabase
+        .from('nutrixo_meals')
+        .insert([payload])
+        .select()
+        .single();
+
+    if (error) throw new Error(error.message || 'Erro ao duplicar refeição.');
+    return data;
+}
+
+export async function reanalyzeMealEntry(mealId, { description, mealType }) {
+    const analysis = await generateFoodAnalysisFromText(description, mealType);
+    return updateMealEntry(mealId, {
+        meal_type: mealType,
+        description,
+        analysis,
+        calories: analysis.totalCalories || 0,
+        protein: analysis.totalProtein || 0,
+        carbs: analysis.totalCarbs || 0,
+        fats: analysis.totalFats || 0,
+        input_method: 'manual',
+    });
 }
 
 // ============================================================
@@ -584,13 +1327,14 @@ Responda sempre em português do Brasil. Seja conciso mas informativo. Use emoji
 IMPORTANTE: Sempre lembre que você não substitui um profissional de saúde.`
     };
 
-    const stream = await insforge.ai.chat.completions.create({
+    // Para streaming, retorna a response do fetch
+    const response = await createChatCompletion({
         model: AI_MODEL,
         messages: [systemMessage, ...messages],
         stream: true,
     });
 
-    return stream;
+    return response;
 }
 
 // ============================================================
@@ -598,10 +1342,9 @@ IMPORTANTE: Sempre lembre que você não substitui um profissional de saúde.`
 // ============================================================
 export async function getExamHistory() {
     const userEmail = await getAuthenticatedEmail();
-    const { data, error } = await insforge.database
+    const { data, error } = await supabase
         .from('nutrixo_exams')
         .select('*')
-        .eq('status', 'completed')
         .eq('user_email', userEmail)
         .order('created_at', { ascending: false });
 
@@ -612,7 +1355,7 @@ export async function getExamHistory() {
 export async function getTodayMeals() {
     const userEmail = await getAuthenticatedEmail();
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await insforge.database
+    const { data, error } = await supabase
         .from('nutrixo_meals')
         .select('*')
         .eq('user_email', userEmail)
@@ -625,7 +1368,7 @@ export async function getTodayMeals() {
 
 export async function getLatestMeasurements() {
     const userEmail = await getAuthenticatedEmail();
-    const { data, error } = await insforge.database
+    const { data, error } = await supabase
         .from('nutrixo_measurements')
         .select('*')
         .eq('status', 'completed')
@@ -640,10 +1383,9 @@ export async function getLatestMeasurements() {
 
 export async function getMeasurementHistory() {
     const userEmail = await getAuthenticatedEmail();
-    const { data, error } = await insforge.database
+    const { data, error } = await supabase
         .from('nutrixo_measurements')
         .select('*')
-        .eq('status', 'completed')
         .eq('user_email', userEmail)
         .order('created_at', { ascending: false });
 
@@ -654,7 +1396,7 @@ export async function getMeasurementHistory() {
 export async function getLatestNutritionPlan() {
     try {
         const userEmail = await getAuthenticatedEmail();
-        const { data, error } = await insforge.database
+        const { data, error } = await supabase
             .from('nutrixo_plans')
             .select('*')
             .eq('status', 'completed')
@@ -674,15 +1416,120 @@ export async function getLatestNutritionPlan() {
     }
 }
 
+function formatInsightId(prefix, value) {
+    return `${prefix}:${String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^\w]+/g, '-')
+        .replace(/^-+|-+$/g, '')}`;
+}
+
+function buildInsightFacts({ latestExam, measurement, plan, todayMeals }) {
+    const facts = [];
+    const biomarkers = Array.isArray(latestExam?.analysis?.biomarkers) ? latestExam.analysis.biomarkers : [];
+
+    biomarkers.forEach((b) => {
+        const status = String(b?.status || '').toLowerCase();
+        if (!['high', 'low', 'normal'].includes(status)) return;
+        const id = formatInsightId('exam', b?.name);
+        facts.push({
+            id,
+            domain: 'exam',
+            severity: status === 'normal' ? 'info' : 'alert',
+            status,
+            text: `${b?.name}: ${b?.value} ${b?.unit || ''} (referência: ${b?.reference || 'não informada'})`,
+        });
+    });
+
+    const measurementData = measurement?.analysis?.measurements || measurement?.analysis || {};
+    const bmi = measurement?.analysis?.bmi;
+    if (bmi?.value !== undefined && bmi?.value !== null) {
+        facts.push({
+            id: 'measurement:bmi',
+            domain: 'measurement',
+            severity: 'info',
+            status: 'normal',
+            text: `IMC atual: ${bmi.value}${bmi.classification ? ` (${bmi.classification})` : ''}`,
+        });
+    }
+    if (measurementData?.bodyFat?.value !== undefined) {
+        facts.push({
+            id: 'measurement:body-fat',
+            domain: 'measurement',
+            severity: 'info',
+            status: 'normal',
+            text: `Gordura corporal: ${measurementData.bodyFat.value}${measurementData.bodyFat.unit ? ` ${measurementData.bodyFat.unit}` : ''}`,
+        });
+    }
+    if (measurementData?.weight?.value !== undefined) {
+        facts.push({
+            id: 'measurement:weight',
+            domain: 'measurement',
+            severity: 'info',
+            status: 'normal',
+            text: `Peso atual: ${measurementData.weight.value}${measurementData.weight.unit ? ` ${measurementData.weight.unit}` : ''}`,
+        });
+    }
+
+    const dailyMacros = plan?.analysis?.dailyMacros || null;
+    if (dailyMacros && Object.keys(dailyMacros).length > 0) {
+        facts.push({
+            id: 'plan:daily-macros',
+            domain: 'plan',
+            severity: 'info',
+            status: 'normal',
+            text: `Plano diário: ${dailyMacros.calories || 0} kcal, proteína ${dailyMacros.protein || 0}g, carbo ${dailyMacros.carbs || 0}g, gordura ${dailyMacros.fats || 0}g`,
+        });
+    }
+
+    if (Array.isArray(todayMeals) && todayMeals.length > 0) {
+        const totals = todayMeals.reduce((acc, meal) => {
+            acc.calories += Number(meal?.calories || 0);
+            acc.protein += Number(meal?.protein || 0);
+            acc.carbs += Number(meal?.carbs || 0);
+            acc.fats += Number(meal?.fats || 0);
+            return acc;
+        }, { calories: 0, protein: 0, carbs: 0, fats: 0 });
+
+        facts.push({
+            id: 'meals:today-totals',
+            domain: 'meals',
+            severity: 'info',
+            status: 'normal',
+            text: `Consumo hoje: ${Math.round(totals.calories)} kcal, proteína ${Math.round(totals.protein)}g, carbo ${Math.round(totals.carbs)}g, gordura ${Math.round(totals.fats)}g`,
+        });
+    }
+
+    return facts;
+}
+
+function buildInsightsFallbackFromFacts(facts = []) {
+    const ordered = [...facts].sort((a, b) => {
+        const aPrio = a.severity === 'alert' ? 1 : 2;
+        const bPrio = b.severity === 'alert' ? 1 : 2;
+        return aPrio - bPrio;
+    });
+
+    return ordered.slice(0, 3).map((fact, idx) => ({
+        id: `fallback-${idx + 1}`,
+        type: fact.severity === 'alert' ? 'warning' : 'tip',
+        title: fact.severity === 'alert' ? 'Alerta baseado no exame' : 'Resumo do seu dado atual',
+        description: fact.text.slice(0, 150),
+        factId: fact.id,
+    }));
+}
+
 export async function generateHealthInsights() {
     try {
         await getAuthenticatedEmail();
 
         // 1. Coletar dados mais recentes para contexto
-        const [history, measurement, plan] = await Promise.all([
+        const [history, measurement, plan, todayMeals] = await Promise.all([
             getExamHistory(),
             getLatestMeasurements(),
-            getLatestNutritionPlan()
+            getLatestNutritionPlan(),
+            getTodayMeals(),
         ]);
 
         const latestExam = history && history.length > 0 ? history[0] : null;
@@ -692,20 +1539,17 @@ export async function generateHealthInsights() {
             return [];
         }
 
-        // 2. Preparar contexto para a IA
-        const context = {
-            exam: latestExam?.analysis || null,
-            measurement: measurement?.analysis || null,
-            plan: plan?.analysis || null
-        };
+        // 2. Preparar fatos reais e validados para IA (evita alucinação)
+        const facts = buildInsightFacts({ latestExam, measurement, plan, todayMeals });
+        if (facts.length === 0) return [];
 
-        // 3. Chamar IA para gerar insights
-        const completion = await insforge.ai.chat.completions.create({
+        // 3. Chamar IA para sintetizar insights APENAS dos fatos existentes
+        const completion = await createChatCompletion({
             model: AI_MODEL,
             messages: [
                 {
                     role: 'system',
-                    content: `Você é um especialista em saúde e longevidade. Analise os dados do usuário e gere exatamente 3 insights curtos e impactantes.
+                    content: `Você é um especialista em saúde e longevidade. Gere insights SOMENTE com base nos fatos fornecidos.
                     JSON estruturado:
                     {
                       "insights": [
@@ -713,26 +1557,51 @@ export async function generateHealthInsights() {
                           "id": "string único",
                           "type": "positive" | "warning" | "tip",
                           "title": "Título curto",
-                          "description": "Descrição de no máximo 150 caracteres"
+                          "description": "Descrição de no máximo 150 caracteres",
+                          "factId": "id de um fato de entrada usado no insight"
                         }
                       ]
                     }
-                    Priorize:
-                    - Alertas se houver exames alterados.
-                    - Elogios se o IMC ou gordura estiverem bons.
-                    - Dicas baseadas no plano alimentar vs medidas físicas.
+                    Regras obrigatórias:
+                    - Use EXATAMENTE 3 insights.
+                    - Todo insight DEVE referenciar factId válido.
+                    - NÃO invente qualquer métrica que não exista nos fatos.
                     Retorne APENAS o JSON.`
                 },
                 {
                     role: 'user',
-                    content: `Dados atuais: ${JSON.stringify(context)}. Gere os 3 melhores insights agora.`
+                    content: `Fatos reais do usuário: ${JSON.stringify(facts)}`
                 }
-            ],
-            response_format: { type: 'json_object' }
+            ]
         });
 
-        const response = JSON.parse(completion.choices[0].message.content);
-        return response.insights || [];
+        const parsed = parseAIJsonResponse(completion.choices[0].message.content);
+        const factIds = new Set(facts.map((f) => f.id));
+        const insights = Array.isArray(parsed?.insights) ? parsed.insights : [];
+
+        const validated = insights
+            .filter((insight) => insight && typeof insight === 'object')
+            .filter((insight) => factIds.has(String(insight.factId || '')))
+            .map((insight, idx) => ({
+                id: insight.id || `insight-${idx + 1}`,
+                type: ['positive', 'warning', 'tip'].includes(insight.type) ? insight.type : 'tip',
+                title: String(insight.title || 'Insight').slice(0, 80),
+                description: String(insight.description || '').slice(0, 150),
+                factId: String(insight.factId),
+            }))
+            .slice(0, 3);
+
+        if (validated.length === 0) {
+            return buildInsightsFallbackFromFacts(facts);
+        }
+
+        if (validated.length < 3) {
+            const fallback = buildInsightsFallbackFromFacts(facts)
+                .filter((item) => !validated.some((v) => v.factId === item.factId));
+            return [...validated, ...fallback].slice(0, 3);
+        }
+
+        return validated;
 
     } catch (error) {
         console.error("Erro ao gerar insights por IA:", error);

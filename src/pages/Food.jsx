@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
-import { Camera, Mic, Scan, Loader2, AlertTriangle, CheckCircle, RefreshCw, UtensilsCrossed, X, MicOff } from 'lucide-react';
+import { Camera, Mic, Loader2, AlertTriangle, CheckCircle, RefreshCw, UtensilsCrossed, MicOff, Pencil, Trash2, Copy, CalendarDays, Eye } from 'lucide-react';
 import { useGamification } from '../hooks/useGamification';
-import { analyzeFoodPhoto, analyzeFoodDescription } from '../services/aiService';
+import { analyzeFoodPhoto, analyzeFoodDescription, getMealsByDateRange, updateMealEntry, deleteMealEntry, duplicateMealEntry, reanalyzeMealEntry } from '../services/aiService';
 
 const MEAL_TYPES = [
     { id: 'cafe-da-manha', label: 'Café da Manhã', emoji: '🌅' },
@@ -22,6 +22,14 @@ const hasFoodQuantity = (text = '') => {
     return QUANTITY_PATTERNS.some((pattern) => pattern.test(normalized));
 };
 
+const toDateInput = (value) => {
+    const date = new Date(value);
+    const tzOffset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - tzOffset).toISOString().split('T')[0];
+};
+
+const todayInputValue = () => toDateInput(new Date());
+
 const Food = () => {
     const [selectedMeal, setSelectedMeal] = useState(MEAL_TYPES[0]);
     const [activeMode, setActiveMode] = useState(null);
@@ -33,9 +41,150 @@ const Food = () => {
     const [isListening, setIsListening] = useState(false);
     const [estimationNotice, setEstimationNotice] = useState('');
     const [pendingAnalysis, setPendingAnalysis] = useState(null);
+    const [historyMeals, setHistoryMeals] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState('');
+    const [quickRange, setQuickRange] = useState('today');
+    const [startDate, setStartDate] = useState(todayInputValue());
+    const [endDate, setEndDate] = useState(todayInputValue());
+    const [selectedHistoryMeal, setSelectedHistoryMeal] = useState(null);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [isReanalyzingEdit, setIsReanalyzingEdit] = useState(false);
+    const [editForm, setEditForm] = useState({
+        meal_type: MEAL_TYPES[0].label,
+        description: '',
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+    });
     const fileInputRef = useRef(null);
     const recognitionRef = useRef(null);
     const { addXP } = useGamification();
+
+    const loadHistory = async (dateFrom = startDate, dateTo = endDate) => {
+        setHistoryLoading(true);
+        setHistoryError('');
+        try {
+            const meals = await getMealsByDateRange(dateFrom, dateTo);
+            setHistoryMeals(meals);
+        } catch (err) {
+            setHistoryError(err?.message || 'Erro ao carregar histórico.');
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadHistory(startDate, endDate);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [startDate, endDate]);
+
+    const applyQuickRange = (range) => {
+        const now = new Date();
+        const end = todayInputValue();
+        let start = end;
+
+        if (range === '7d') {
+            const d = new Date(now);
+            d.setDate(d.getDate() - 6);
+            start = toDateInput(d);
+        }
+        if (range === '30d') {
+            const d = new Date(now);
+            d.setDate(d.getDate() - 29);
+            start = toDateInput(d);
+        }
+
+        setQuickRange(range);
+        setStartDate(start);
+        setEndDate(end);
+    };
+
+    const openMealDetail = (meal) => {
+        setSelectedHistoryMeal(meal);
+        setEditForm({
+            meal_type: meal.meal_type || MEAL_TYPES[0].label,
+            description: meal.description || meal.analysis?.description || '',
+            calories: meal.calories || meal.analysis?.totalCalories || 0,
+            protein: meal.protein || meal.analysis?.totalProtein || 0,
+            carbs: meal.carbs || meal.analysis?.totalCarbs || 0,
+            fats: meal.fats || meal.analysis?.totalFats || 0,
+        });
+    };
+
+    const closeMealDetail = () => {
+        setSelectedHistoryMeal(null);
+    };
+
+    const saveMealEdit = async () => {
+        if (!selectedHistoryMeal) return;
+        setIsSavingEdit(true);
+        try {
+            const updated = await updateMealEntry(selectedHistoryMeal.id, {
+                meal_type: editForm.meal_type,
+                description: editForm.description,
+                calories: Number(editForm.calories) || 0,
+                protein: Number(editForm.protein) || 0,
+                carbs: Number(editForm.carbs) || 0,
+                fats: Number(editForm.fats) || 0,
+                input_method: 'manual',
+                analysis: {
+                    ...(selectedHistoryMeal.analysis || {}),
+                    description: editForm.description,
+                    totalCalories: Number(editForm.calories) || 0,
+                    totalProtein: Number(editForm.protein) || 0,
+                    totalCarbs: Number(editForm.carbs) || 0,
+                    totalFats: Number(editForm.fats) || 0,
+                },
+            });
+            openMealDetail(updated);
+            await loadHistory();
+        } catch (err) {
+            setHistoryError(err?.message || 'Erro ao salvar edição.');
+        } finally {
+            setIsSavingEdit(false);
+        }
+    };
+
+    const runMealReanalysis = async () => {
+        if (!selectedHistoryMeal?.id || !editForm.description.trim()) return;
+        setIsReanalyzingEdit(true);
+        try {
+            const updated = await reanalyzeMealEntry(selectedHistoryMeal.id, {
+                description: editForm.description.trim(),
+                mealType: editForm.meal_type,
+            });
+            openMealDetail(updated);
+            await loadHistory();
+        } catch (err) {
+            setHistoryError(err?.message || 'Erro ao reanalisar refeição.');
+        } finally {
+            setIsReanalyzingEdit(false);
+        }
+    };
+
+    const removeMeal = async (mealId) => {
+        if (!window.confirm('Excluir esta refeição? Essa ação não pode ser desfeita.')) return;
+        try {
+            await deleteMealEntry(mealId);
+            if (selectedHistoryMeal?.id === mealId) {
+                closeMealDetail();
+            }
+            await loadHistory();
+        } catch (err) {
+            setHistoryError(err?.message || 'Erro ao excluir refeição.');
+        }
+    };
+
+    const duplicateMeal = async (meal) => {
+        try {
+            await duplicateMealEntry(meal);
+            await loadHistory();
+        } catch (err) {
+            setHistoryError(err?.message || 'Erro ao duplicar refeição.');
+        }
+    };
 
     // ========== PHOTO ==========
     const handlePhotoCapture = async (event) => {
@@ -52,6 +201,7 @@ const Food = () => {
             const result = await analyzeFoodPhoto(file, selectedMeal.label);
             setAnalysisResult(result.analysis);
             addXP('LOG_MEAL');
+            await loadHistory();
         } catch (err) {
             console.error('Erro:', err);
             setError(err.message || 'Erro ao analisar a foto.');
@@ -131,6 +281,7 @@ const Food = () => {
             };
             setAnalysisResult(nextAnalysis);
             addXP('LOG_MEAL');
+            await loadHistory();
         } catch (err) {
             console.error('Erro:', err);
             const errorMessage = err?.message || 'Erro ao analisar.';
@@ -489,7 +640,255 @@ const Food = () => {
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                <div className="mt-8 border-t border-gray-200 dark:border-border-subtle pt-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">📚 Histórico de Refeições</h3>
+                        <div className="inline-flex items-center gap-1 rounded-xl border border-gray-200 dark:border-border-subtle p-1 bg-gray-50 dark:bg-bg-secondary">
+                            <button
+                                onClick={() => applyQuickRange('today')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${quickRange === 'today' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-text-secondary'}`}
+                            >
+                                Hoje
+                            </button>
+                            <button
+                                onClick={() => applyQuickRange('7d')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${quickRange === '7d' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-text-secondary'}`}
+                            >
+                                7 dias
+                            </button>
+                            <button
+                                onClick={() => applyQuickRange('30d')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${quickRange === '30d' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-text-secondary'}`}
+                            >
+                                30 dias
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                        <label className="text-xs text-gray-600 dark:text-text-secondary">
+                            <span className="inline-flex items-center gap-1 mb-1 font-semibold"><CalendarDays className="w-3.5 h-3.5" /> Data inicial</span>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => {
+                                    setQuickRange('custom');
+                                    setStartDate(e.target.value);
+                                }}
+                                className="w-full rounded-lg border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary px-3 py-2 text-sm"
+                            />
+                        </label>
+                        <label className="text-xs text-gray-600 dark:text-text-secondary">
+                            <span className="inline-flex items-center gap-1 mb-1 font-semibold"><CalendarDays className="w-3.5 h-3.5" /> Data final</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => {
+                                    setQuickRange('custom');
+                                    setEndDate(e.target.value);
+                                }}
+                                className="w-full rounded-lg border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary px-3 py-2 text-sm"
+                            />
+                        </label>
+                    </div>
+
+                    {historyError && (
+                        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                            {historyError}
+                        </div>
+                    )}
+
+                    {historyLoading ? (
+                        <div className="rounded-xl border border-gray-200 dark:border-border-subtle p-4 text-sm text-gray-500 dark:text-text-muted">
+                            Carregando histórico...
+                        </div>
+                    ) : historyMeals.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-300 dark:border-border-subtle p-6 text-sm text-gray-500 dark:text-text-muted text-center">
+                            Nenhuma refeição encontrada no período selecionado.
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {historyMeals.map((meal) => (
+                                <button
+                                    key={meal.id}
+                                    onClick={() => openMealDetail(meal)}
+                                    className="w-full text-left rounded-xl border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-secondary p-4 hover:border-cyan-300 dark:hover:border-cyan-700 transition-colors"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-bold text-sm text-gray-900 dark:text-white">{meal.meal_type || 'Refeição'}</p>
+                                            <p className="text-xs text-gray-500 dark:text-text-muted">{new Date(meal.created_at).toLocaleString('pt-BR')}</p>
+                                            <p className="text-sm text-gray-600 dark:text-text-secondary mt-1">
+                                                {meal.description || meal.analysis?.description || 'Sem descrição'}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">{meal.calories || meal.analysis?.totalCalories || 0} kcal</p>
+                                            <p className="text-[11px] text-gray-500 dark:text-text-muted">
+                                                P:{meal.protein || meal.analysis?.totalProtein || 0}g C:{meal.carbs || meal.analysis?.totalCarbs || 0}g G:{meal.fats || meal.analysis?.totalFats || 0}g
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                                            <Eye className="w-3 h-3" /> Detalhes
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openMealDetail(meal);
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-bg-tertiary dark:text-text-secondary"
+                                        >
+                                            <Pencil className="w-3 h-3" /> Editar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                await duplicateMeal(meal);
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-bg-tertiary dark:text-text-secondary"
+                                        >
+                                            <Copy className="w-3 h-3" /> Duplicar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                await removeMeal(meal.id);
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
+                                        >
+                                            <Trash2 className="w-3 h-3" /> Excluir
+                                        </button>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
+
+            <AnimatePresence>
+                {selectedHistoryMeal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm p-4 flex items-center justify-center"
+                        onClick={closeMealDetail}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="w-full max-w-2xl rounded-2xl border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-elevated p-5 max-h-[90vh] overflow-y-auto"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white mb-4">Editar refeição</h3>
+                            <div className="grid sm:grid-cols-2 gap-3">
+                                <label className="text-xs text-gray-600 dark:text-text-secondary">
+                                    Tipo de refeição
+                                    <select
+                                        value={editForm.meal_type}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, meal_type: e.target.value }))}
+                                        className="mt-1 w-full rounded-lg border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary px-3 py-2 text-sm"
+                                    >
+                                        {MEAL_TYPES.map((meal) => (
+                                            <option key={meal.id} value={meal.label}>{meal.label}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="text-xs text-gray-600 dark:text-text-secondary">
+                                    Calorias
+                                    <input
+                                        type="number"
+                                        value={editForm.calories}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, calories: e.target.value }))}
+                                        className="mt-1 w-full rounded-lg border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary px-3 py-2 text-sm"
+                                    />
+                                </label>
+                                <label className="text-xs text-gray-600 dark:text-text-secondary">
+                                    Proteínas (g)
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={editForm.protein}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, protein: e.target.value }))}
+                                        className="mt-1 w-full rounded-lg border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary px-3 py-2 text-sm"
+                                    />
+                                </label>
+                                <label className="text-xs text-gray-600 dark:text-text-secondary">
+                                    Carboidratos (g)
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={editForm.carbs}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, carbs: e.target.value }))}
+                                        className="mt-1 w-full rounded-lg border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary px-3 py-2 text-sm"
+                                    />
+                                </label>
+                                <label className="text-xs text-gray-600 dark:text-text-secondary sm:col-span-2">
+                                    Gorduras (g)
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={editForm.fats}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, fats: e.target.value }))}
+                                        className="mt-1 w-full rounded-lg border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary px-3 py-2 text-sm"
+                                    />
+                                </label>
+                                <label className="text-xs text-gray-600 dark:text-text-secondary sm:col-span-2">
+                                    Descrição
+                                    <textarea
+                                        value={editForm.description}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
+                                        className="mt-1 w-full rounded-lg border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-primary px-3 py-2 text-sm min-h-[90px]"
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                    onClick={saveMealEdit}
+                                    disabled={isSavingEdit}
+                                    className="px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-bold hover:bg-cyan-500 disabled:opacity-60"
+                                >
+                                    {isSavingEdit ? 'Salvando...' : 'Salvar edição'}
+                                </button>
+                                <button
+                                    onClick={runMealReanalysis}
+                                    disabled={isReanalyzingEdit || !editForm.description.trim()}
+                                    className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-500 disabled:opacity-60"
+                                >
+                                    {isReanalyzingEdit ? 'Reanalisando...' : 'Reanalisar com IA'}
+                                </button>
+                                <button
+                                    onClick={() => duplicateMeal(selectedHistoryMeal)}
+                                    className="px-4 py-2 rounded-lg border border-gray-200 dark:border-border-subtle text-sm font-semibold"
+                                >
+                                    Duplicar
+                                </button>
+                                <button
+                                    onClick={() => removeMeal(selectedHistoryMeal.id)}
+                                    className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-500"
+                                >
+                                    Excluir
+                                </button>
+                                <button
+                                    onClick={closeMealDetail}
+                                    className="px-4 py-2 rounded-lg border border-gray-200 dark:border-border-subtle text-sm font-semibold"
+                                >
+                                    Fechar
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };

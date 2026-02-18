@@ -77,6 +77,22 @@ const Labs = () => {
         }
     };
 
+    const formatBiomarkerValue = (value) => {
+        if (value === null || value === undefined || value === '') return '--';
+        if (typeof value !== 'number') return value;
+        return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
+    };
+
+    const getImportStatusBadge = (status) => {
+        if (status === 'failed') {
+            return { label: 'Falhou', cls: 'bg-red-100 text-red-700' };
+        }
+        if (status === 'analyzing') {
+            return { label: 'Analisando', cls: 'bg-amber-100 text-amber-700' };
+        }
+        return { label: 'Analisado', cls: 'bg-green-100 text-green-700' };
+    };
+
     // Reusable component to render analysis details
     const AnalysisDetailView = ({ analysis }) => (
         <AIAnalysisResults show={true}>
@@ -102,7 +118,7 @@ const Labs = () => {
                         <div>
                             <h4 className="font-bold text-base text-gray-900 dark:text-text-primary">{biomarker.name}</h4>
                             <p className="text-gray-600 dark:text-text-muted text-sm">
-                                <span className="font-medium">Resultado:</span> {biomarker.value} {biomarker.unit}
+                                <span className="font-medium">Resultado:</span> {formatBiomarkerValue(biomarker.value)} {biomarker.unit}
                                 <span className="mx-2 text-gray-300">|</span>
                                 <span className="text-xs">Ref: {biomarker.reference}</span>
                             </p>
@@ -145,7 +161,7 @@ const Labs = () => {
                 <AIAnalysisPage.UploadZone
                     onUpload={handleFileUpload}
                     uploadedFile={uploadedFile}
-                    accept=".pdf"
+                    accept=".pdf,.jpg,.jpeg,.png"
                 />
 
                 <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message="IA Analisando seu Exame..." />
@@ -188,63 +204,72 @@ const Labs = () => {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {history.map((exam) => (
-                            <motion.div
-                                key={exam.id}
-                                layout
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="bg-white dark:bg-bg-elevated rounded-2xl border border-gray-200 dark:border-border-subtle overflow-hidden shadow-sm"
-                            >
-                                <div
-                                    onClick={() => toggleExamDetails(exam.id)}
-                                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-bg-secondary transition-colors"
+                        {history.map((exam) => {
+                            const badge = getImportStatusBadge(exam.status);
+                            return (
+                                <motion.div
+                                    key={exam.id}
+                                    layout
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-white dark:bg-bg-elevated rounded-2xl border border-gray-200 dark:border-border-subtle overflow-hidden shadow-sm"
                                 >
-                                    <div className="flex items-center space-x-4">
-                                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400">
-                                            <FileText className="w-5 h-5" />
+                                    <div
+                                        onClick={() => toggleExamDetails(exam.id)}
+                                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-bg-secondary transition-colors"
+                                    >
+                                        <div className="flex items-center space-x-4">
+                                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                                <FileText className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <div className="flex flex-col items-start gap-1 mb-1">
+                                                    <h4 className="font-bold text-gray-900 dark:text-text-primary text-sm truncate w-full pr-4" title={exam.file_name}>
+                                                        {exam.file_name}
+                                                    </h4>
+                                                    <span className={`px-2 py-0.5 text-[10px] rounded-full uppercase font-bold ${badge.cls}`}>
+                                                        {badge.label}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center text-xs text-gray-500 dark:text-text-muted mt-1 space-x-3">
+                                                    <span className="flex items-center">
+                                                        <Calendar className="w-3 h-3 mr-1" />
+                                                        {new Date(exam.created_at).toLocaleDateString('pt-BR')}
+                                                    </span>
+                                                    <span>•</span>
+                                                    <span>{exam.analysis?.biomarkers?.length || 0} biomarcadores</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div className="flex flex-col items-start gap-1 mb-1">
-                                                <h4 className="font-bold text-gray-900 dark:text-text-primary text-sm truncate w-full pr-4" title={exam.file_name}>
-                                                    {exam.file_name}
-                                                </h4>
-                                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full uppercase font-bold">
-                                                    Analisado
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center text-xs text-gray-500 dark:text-text-muted mt-1 space-x-3">
-                                                <span className="flex items-center">
-                                                    <Calendar className="w-3 h-3 mr-1" />
-                                                    {new Date(exam.created_at).toLocaleDateString()}
-                                                </span>
-                                                <span>•</span>
-                                                <span>{exam.analysis?.biomarkers?.length || 0} biomarcadores</span>
-                                            </div>
+                                        <div className="text-gray-400">
+                                            {expandedExamId === exam.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                                         </div>
                                     </div>
-                                    <div className="text-gray-400">
-                                        {expandedExamId === exam.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                                    </div>
-                                </div>
 
-                                <AnimatePresence>
-                                    {expandedExamId === exam.id && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.3 }}
-                                            className="border-t border-gray-100 dark:border-border-subtle bg-gray-50/50 dark:bg-bg-secondary/30"
-                                        >
-                                            <div className="p-4 md:p-6">
-                                                <AnalysisDetailView analysis={exam.analysis} />
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </motion.div>
-                        ))}
+                                    <AnimatePresence>
+                                        {expandedExamId === exam.id && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.3 }}
+                                                className="border-t border-gray-100 dark:border-border-subtle bg-gray-50/50 dark:bg-bg-secondary/30"
+                                            >
+                                                <div className="p-4 md:p-6">
+                                                    {exam.status === 'completed' ? (
+                                                        <AnalysisDetailView analysis={exam.analysis} />
+                                                    ) : (
+                                                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                                            {exam.analysis?.error || 'Não foi possível concluir a análise deste arquivo.'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 )}
             </div>

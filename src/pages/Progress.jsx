@@ -30,6 +30,7 @@ import {
 import { getExamHistory, getMeasurementHistory } from '../services/aiService';
 import BiomarkerDetailDrawer from '../components/BiomarkerDetailDrawer';
 import { useGamification } from '../hooks/useGamification';
+import { parsePtBrNumber, parsePtBrReferenceRange } from '../lib/numberLocale';
 
 // --- Sub-componente: InsightDrawer (Painel Lateral Contextual) ---
 const InsightDrawer = ({ isOpen, onClose }) => {
@@ -312,8 +313,8 @@ const getSentinelAnalysis = (marker) => {
         return "A IA Nutrixo iniciou o monitoramento deste marcador. Continue registrando seus exames para desbloquear insights detalhados de tendência.";
     }
 
-    const current = parseFloat(marker.value);
-    const previous = parseFloat(marker.history[marker.history.length - 2].value);
+    const current = parsePtBrNumber(marker.value);
+    const previous = parsePtBrNumber(marker.history[marker.history.length - 2].value);
     const diff = current - previous;
     const absDiff = Math.abs(diff);
     const percentChange = ((diff / previous) * 100).toFixed(1);
@@ -443,33 +444,7 @@ const BiomarkerDetailOverlay = ({ isOpen, onClose, marker }) => {
 
 // Helper para parsear valores numéricos de referência (PT-BR)
 const parseNumberVal = (str) => {
-    if (!str) return null;
-    if (typeof str === 'number') return str;
-
-    // Remove tudo que não for dígito, ponto, vírgula ou traço
-    const clean = str.replace(/[^\d.,-]/g, '').trim();
-    if (!clean) return null;
-
-    // Tenta detectar formato PT-BR (1.000,00) vs EN (1,000.00)
-    // Se tem vírgula, assume PT-BR (vírgula = decimal)
-    if (clean.includes(',')) {
-        // Remove pontos de milhar e troca vírgula por ponto
-        return parseFloat(clean.replace(/\./g, '').replace(',', '.'));
-    }
-
-    // Se não tem vírgula, pode ser formato EN (1.5) ou PT-BR milhar (4.000)
-    // CRÍTICO: Se tiver EXATAMENTE 3 dígitos após o ÚLTIMO ponto, assume milhar (ex: 4.000, 150.000)
-    // A menos que seja algo pequeno como 1.500 (pode ser 1,5 ou 1500, mas no contexto de exames, 1.500 geralmente é 1500)
-    if (clean.match(/^\d{1,3}\.\d{3}$/) || clean.match(/^\d{1,3}\.\d{3}\.\d{3}$/)) {
-        return parseFloat(clean.replace(/\./g, ''));
-    }
-
-    // Se tiver apenas um ponto e não for no final, e não casou com o padrão de milhar acima, assume decimal
-    if ((clean.match(/\./g) || []).length === 1 && clean.indexOf('.') !== clean.length - 1) {
-        return parseFloat(clean); // Assume EN decimal
-    }
-
-    return parseFloat(clean.replace(/\./g, '')); // Fallback: remove pontos
+    return parsePtBrNumber(str);
 };
 
 // Helper para traduzir labels vindos da IA (Inglês -> Português)
@@ -564,41 +539,7 @@ const formatDisplayValue = (val) => {
 };
 
 const parseReferenceRange = (refString) => {
-    if (!refString) return null;
-
-    // Limpar unidades e espaços extras antes de quebrar
-    const cleanRef = refString.replace(/\/mm³|\/mm3|g\/dL|mg\/dL|%|ng\/mL|pg\/mL/gi, '').trim();
-
-    // Tenta quebrar por " - " ou "-" ou " a " ou travessão/meia-risca
-    const parts = cleanRef.split(/[-–—]| a /);
-
-    if (parts.length < 2) {
-        // Handle cases like "até 99" or "acima de 70"
-        if (refString.toLowerCase().includes('até') || refString.includes('<')) {
-            const valPart = refString.toLowerCase().split('até')[1] || refString.split('<')[1];
-            const val = parseNumberVal(valPart);
-            return val !== null ? [null, val] : null;
-        }
-        if (refString.toLowerCase().includes('acima de') || refString.includes('>')) {
-            const valPart = refString.toLowerCase().split('acima de')[1] || refString.split('>')[1];
-            const val = parseNumberVal(valPart);
-            return val !== null ? [val, null] : null;
-        }
-        return null;
-    }
-
-    const min = parseNumberVal(parts[0]);
-    const max = parseNumberVal(parts[1]);
-
-    // If both are null, it's not a valid range
-    if (min === null && max === null) return null;
-
-    // If one is null, it's an open-ended range
-    if (min === null) return [null, max];
-    if (max === null) return [min, null];
-
-    // Ensure min is less than or equal to max
-    return [Math.min(min, max), Math.max(min, max)];
+    return parsePtBrReferenceRange(refString);
 };
 
 
@@ -616,12 +557,12 @@ const EnhancedAreaChart = ({ data, color = "#06b6d4", height = 120, targetRange 
     // Isso permite visualizar o ponto em relação ao range de referência
     const chartData = data.length === 1 ? [data[0], data[0]] : data;
 
-    const values = chartData.map(d => parseFloat(d.value)).filter(v => !isNaN(v));
+    const values = chartData.map(d => parseNumberVal(d.value)).filter(v => !isNaN(v));
     if (values.length === 0) return null;
 
     const minVal = Math.min(...values);
     const maxVal = Math.max(...values);
-    const baseline = parseFloat(chartData[0].value) || minVal;
+    const baseline = parseNumberVal(chartData[0].value) || minVal;
 
     let displayMin = minVal;
     let displayMax = maxVal;
@@ -660,7 +601,7 @@ const EnhancedAreaChart = ({ data, color = "#06b6d4", height = 120, targetRange 
     };
 
     const points = chartData.map((d, i) => {
-        const val = parseFloat(d.value);
+        const val = parseNumberVal(d.value);
         return {
             x: getX(i),
             y: getY(val),
@@ -766,7 +707,7 @@ const Progress = () => {
         const trend = [];
         [...exams].reverse().forEach(exam => {
             const b = exam.analysis?.biomarkers?.find(x => x.name === name);
-            if (b) trend.push({ value: b.value, date: new Date(exam.created_at).toLocaleDateString(), unit: b.unit });
+            if (b) trend.push({ value: b.value, date: new Date(exam.created_at).toLocaleDateString('pt-BR'), unit: b.unit });
         });
         return trend;
     }, [exams]);
@@ -778,7 +719,7 @@ const Progress = () => {
             let item = obj[targetKey];
             if (typeof item === 'string') {
                 const match = item.match(/([\d.,]+)\s*(.*)/);
-                if (match) return { value: parseFloat(match[1].replace(',', '.')), unit: match[2].trim() || '' };
+                if (match) return { value: parseNumberVal(match[1]), unit: match[2].trim() || '' };
             }
             if (item !== undefined && item !== null) {
                 if (typeof item === 'object' && item.value !== undefined) return item;
@@ -795,11 +736,11 @@ const Progress = () => {
         [...measurements].reverse().forEach(m => {
             const valData = findValue(m.analysis?.measurements || m.analysis, key);
             if (valData && valData.value !== null && valData.value !== undefined) {
-                const numericVal = parseFloat(valData.value);
+                const numericVal = parseNumberVal(valData.value);
                 if (!isNaN(numericVal)) {
                     trend.push({
                         value: numericVal,
-                        date: new Date(m.created_at).toLocaleDateString(),
+                        date: new Date(m.created_at).toLocaleDateString('pt-BR'),
                         unit: valData.unit || ''
                     });
                 }
@@ -827,6 +768,53 @@ const Progress = () => {
         };
         loadAllData();
     }, []);
+
+    const biomarkerProblemCount = React.useMemo(() => {
+        if (!exams.length) return 0;
+
+        const uniqueBiomarkers = new Set();
+        exams.forEach(exam => {
+            exam.analysis?.biomarkers?.forEach(b => uniqueBiomarkers.add(b.name));
+        });
+
+        let count = 0;
+        Array.from(uniqueBiomarkers).forEach((name) => {
+            const trend = getBiomarkerTrend(name);
+            const lastValue = trend[trend.length - 1];
+            if (!lastValue) return;
+
+            const latestExam = exams.find(e => e.analysis?.biomarkers?.some(b => b.name === name));
+            const latestBiomarkerData = latestExam?.analysis?.biomarkers?.find(b => b.name === name);
+
+            let parsedTarget = null;
+            if (latestBiomarkerData?.reference) {
+                parsedTarget = parseReferenceRange(latestBiomarkerData.reference);
+            }
+
+            const rawStatus = String(latestBiomarkerData?.status || '').toLowerCase();
+            let calculatedStatus = ['normal', 'low', 'high'].includes(rawStatus) ? rawStatus : 'unknown';
+            const val = parseNumberVal(lastValue.value);
+
+            if (parsedTarget && val !== null && !isNaN(val)) {
+                const [min, max] = parsedTarget;
+                if (min !== null && max !== null) {
+                    if (val >= min && val <= max) calculatedStatus = 'normal';
+                    else if (val < min) calculatedStatus = 'low';
+                    else calculatedStatus = 'high';
+                } else if (min !== null && max === null) {
+                    calculatedStatus = val >= min ? 'normal' : 'low';
+                } else if (min === null && max !== null) {
+                    calculatedStatus = val <= max ? 'normal' : 'high';
+                }
+            }
+
+            if (calculatedStatus === 'high' || calculatedStatus === 'low') {
+                count += 1;
+            }
+        });
+
+        return count;
+    }, [exams, getBiomarkerTrend]);
 
 
     const biomarkerCards = React.useMemo(() => {
@@ -910,10 +898,11 @@ const Progress = () => {
                     parsedTarget = meta.target;
                 }
 
-                let calculatedStatus = latestBiomarkerData?.status || 'unknown';
-                const val = parseFloat(lastValue.value);
+                const rawStatus = String(latestBiomarkerData?.status || '').toLowerCase();
+                let calculatedStatus = ['normal', 'low', 'high'].includes(rawStatus) ? rawStatus : 'unknown';
+                const val = parseNumberVal(lastValue.value);
 
-                if (parsedTarget && !isNaN(val)) {
+                if (parsedTarget && val !== null && !isNaN(val)) {
                     const [min, max] = parsedTarget;
                     if (min !== null && max !== null) {
                         if (val >= min && val <= max) calculatedStatus = 'normal';
@@ -947,7 +936,8 @@ const Progress = () => {
                     unit: lastValue.unit,
                     color: cardColor,
                     icon: meta.icon,
-                    status: calculatedStatus === 'normal' ? 'success' : 'danger',
+                    status: calculatedStatus === 'normal' ? 'success' :
+                        (calculatedStatus === 'high' || calculatedStatus === 'low') ? 'danger' : 'warning',
                     trend: trend,
                     target: parsedTarget,
                     calculatedStatus,
@@ -960,8 +950,12 @@ const Progress = () => {
                 return biomarkerData;
             }).filter(Boolean);
 
-        // Sorting logic
-        const sortedCards = [...cardsData].sort((a, b) => {
+        // Filtering + Sorting logic
+        const filteredCards = sortBy === 'problems'
+            ? cardsData.filter(c => c.calculatedStatus === 'high' || c.calculatedStatus === 'low')
+            : cardsData;
+
+        const sortedCards = [...filteredCards].sort((a, b) => {
             if (sortBy === 'problems') {
                 if (a.priority !== b.priority) return a.priority - b.priority;
             }
@@ -974,6 +968,15 @@ const Progress = () => {
             acc[card.category].push(card);
             return acc;
         }, {});
+
+        if (Object.keys(groups).length === 0 && sortBy === 'problems') {
+            return (
+                <div className="col-span-full py-20 text-center">
+                    <AlertCircle className="w-12 h-12 text-zinc-200 dark:text-zinc-800 mx-auto mb-4" />
+                    <p className="text-zinc-500 font-medium">Nenhum biomarcador fora da faixa no período selecionado.</p>
+                </div>
+            );
+        }
 
         if (Object.keys(groups).length === 0 && searchTerm) {
             return (
@@ -1147,8 +1150,8 @@ const Progress = () => {
 
                 let status = meta.defaultStatus || 'REGISTRADO';
                 if (trend.length >= 2) {
-                    const prevValue = parseFloat(trend[trend.length - 2].value);
-                    const currValue = parseFloat(lastData.value);
+                    const prevValue = parseNumberVal(trend[trend.length - 2].value);
+                    const currValue = parseNumberVal(lastData.value);
                     if (key === 'weight' || key === 'bodyFat' || key === 'waist') {
                         if (currValue < prevValue) status = 'EXCELENTE';
                         else if (currValue > prevValue) status = 'ATENÇÃO';
@@ -1245,7 +1248,7 @@ const Progress = () => {
 
         if (wTrend.length >= 2 && gTrend.length >= 2) {
             const wDiff = wTrend[wTrend.length - 1].value - wTrend[wTrend.length - 2].value;
-            const gDiff = parseFloat(gTrend[gTrend.length - 1].value) - parseFloat(gTrend[gTrend.length - 2].value);
+            const gDiff = parseNumberVal(gTrend[gTrend.length - 1].value) - parseNumberVal(gTrend[gTrend.length - 2].value);
 
             if (wDiff < 0 && gDiff < 0) {
                 insights.push({
@@ -1278,7 +1281,7 @@ const Progress = () => {
         // 3. Alerta: Colesterol total subindo
         const cTrend = getBiomarkerTrend('Colesterol Total');
         if (cTrend.length >= 2) {
-            const cDiff = parseFloat(cTrend[cTrend.length - 1].value) - parseFloat(cTrend[cTrend.length - 2].value);
+            const cDiff = parseNumberVal(cTrend[cTrend.length - 1].value) - parseNumberVal(cTrend[cTrend.length - 2].value);
             if (cDiff > 10) {
                 insights.push({
                     title: 'Atenção Lipídica',
@@ -1292,7 +1295,7 @@ const Progress = () => {
         // 4. Nova: Deficiência de Vitamina D
         const vTrend = getBiomarkerTrend('Vitamina D');
         if (vTrend.length > 0) {
-            const lastV = parseFloat(vTrend[vTrend.length - 1].value);
+            const lastV = parseNumberVal(vTrend[vTrend.length - 1].value);
             if (lastV < 30) {
                 insights.push({
                     title: 'Vitamina D em Alerta',
@@ -1307,7 +1310,7 @@ const Progress = () => {
         // 5. Nova: Estabilidade Glicêmica
         const glucTrend = getBiomarkerTrend('Glicose');
         if (glucTrend.length >= 3) {
-            const values = glucTrend.slice(-3).map(v => parseFloat(v.value));
+            const values = glucTrend.slice(-3).map(v => parseNumberVal(v.value));
             const variance = Math.max(...values) - Math.min(...values);
             if (variance < 5) {
                 insights.push({
@@ -1406,7 +1409,12 @@ const Progress = () => {
                         <div className="flex items-center gap-2 p-1.5 bg-zinc-100 dark:bg-bg-secondary rounded-2xl border border-zinc-200 dark:border-border-subtle shadow-inner">
                             {[
                                 { id: 'alphabetical', label: 'AZ' },
-                                { id: 'problems', label: 'Problemas' }
+                                {
+                                    id: 'problems',
+                                    label: activeTab === 'labs'
+                                        ? `Problemas (${biomarkerProblemCount})`
+                                        : 'Problemas'
+                                }
                             ].map(opt => (
                                 <button
                                     key={opt.id}

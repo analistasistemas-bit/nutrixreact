@@ -30,4 +30,13 @@ export default defineConfig({
       }
     })
   ],
+  server: {
+    proxy: {
+      '/nv-api': {
+        target: 'https://integrate.api.nvidia.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/nv-api/, ''),
+      }
+    }
+  }
 })

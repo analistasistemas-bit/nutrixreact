@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
-import insforge from '../lib/insforge';
+import supabase from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
@@ -16,10 +16,14 @@ export const AuthProvider = ({ children }) => {
 
         const restoreSession = async () => {
             try {
-                const { data } = await insforge.auth.getCurrentSession();
+                const { data } = await supabase.auth.getSession();
                 if (data?.session) {
-                    setUser(data.session.user);
-                    setAccessToken(data.session.accessToken);
+                    const userData = {
+                        ...data.session.user,
+                        email: data.session.user.email?.toLowerCase()
+                    };
+                    setUser(userData);
+                    setAccessToken(data.session.access_token);
                 }
             } catch (err) {
                 console.error('Erro ao restaurar sessão:', err);
@@ -40,7 +44,7 @@ export const AuthProvider = ({ children }) => {
     // Logout
     const logout = useCallback(async () => {
         try {
-            await insforge.auth.signOut();
+            await supabase.auth.signOut();
         } catch (err) {
             console.error('Erro no logout:', err);
         }
@@ -55,28 +59,28 @@ export const AuthProvider = ({ children }) => {
      * Lança erro se não há sessão ou se o JWT expirou.
      */
     const requireAuth = useCallback(async () => {
-        const { data, error } = await insforge.auth.getCurrentSession();
+        const { data, error } = await supabase.auth.getSession();
 
         if (error || !data?.session) {
             throw new Error('Sessão expirada. Faça login novamente.');
         }
 
         // Verificar se o token expirou
-        if (data.session.expiresAt && new Date() > new Date(data.session.expiresAt)) {
+        if (data.session.expires_at && new Date() > new Date(data.session.expires_at * 1000)) {
             setUser(null);
             setAccessToken(null);
             throw new Error('Sessão expirada. Faça login novamente.');
         }
 
         // Atualizar token se mudou
-        if (data.session.accessToken !== accessToken) {
-            setAccessToken(data.session.accessToken);
+        if (data.session.access_token !== accessToken) {
+            setAccessToken(data.session.access_token);
         }
 
         return {
-            email: data.session.user.email,
+            email: data.session.user.email?.toLowerCase(),
             userId: data.session.user.id,
-            token: data.session.accessToken,
+            token: data.session.access_token,
         };
     }, [accessToken]);
 

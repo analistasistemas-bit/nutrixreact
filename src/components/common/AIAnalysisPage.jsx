@@ -37,7 +37,7 @@ AIAnalysisPage.Header = ({ icon: Icon, title, description, gradient = "from-blue
 );
 
 // 2. UploadZone Component
-AIAnalysisPage.UploadZone = ({ onUpload, accept = ".pdf", label = "Selecionar Arquivo PDF", uploadedFile }) => {
+AIAnalysisPage.UploadZone = ({ onUpload, accept = ".pdf,.jpg,.jpeg,.png", label = "Selecionar PDF ou Imagem", uploadedFile }) => {
     if (uploadedFile) return null;
 
     return (
@@ -59,7 +59,7 @@ AIAnalysisPage.UploadZone = ({ onUpload, accept = ".pdf", label = "Selecionar Ar
                     <Sparkles className="w-3 h-3" />
                 </div>
                 <p className="text-gray-500 dark:text-text-muted text-xs mt-3">
-                    {accept.replace(/\./g, '').toUpperCase()} • Análise por IA
+                    PDF, JPG ou PNG • Análise por IA
                 </p>
             </label>
         </motion.div>

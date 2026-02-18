@@ -50,4 +50,25 @@ Este arquivo serve como o controle de execução para as melhorias do NutixoApp.
   - [ ] Implementar toggle visual para tema "Total Black" (#000000)
 
 ---
+
+## 🍽️ [Épico 5] Diário Persistente (Histórico de Refeições)
+- [ ] **Opção 1 (Atual) - Implementação incremental no `Food.jsx` + `aiService`**
+  - [x] Persistir refeições no banco e recarregar histórico no Diário
+  - [x] Adicionar histórico com filtro de data (Hoje, 7 dias, 30 dias, customizado)
+  - [x] Criar fluxo híbrido: lista com ações rápidas + detalhe ao clicar
+  - [x] Implementar editar refeição (manual) com salvamento
+  - [x] Implementar reanálise IA sobrescrevendo refeição atual
+  - [x] Implementar excluir refeição com confirmação simples
+  - [x] Implementar duplicar refeição no histórico
+  - [ ] Refinar UX (estados vazios, mensagens, feedback de sucesso por ação)
+  - [ ] Cobrir edge-cases (token expirado durante edição/duplicação/exclusão)
+- [ ] **Opção 2 (Evolução) - Refatoração em componentes dedicados**
+  - [ ] Extrair `MealHistoryFilters` (filtros rápidos + período customizado)
+  - [ ] Extrair `MealHistoryList` (cards e ações rápidas)
+  - [ ] Extrair `MealEditorModal` (edição, reanálise, exclusão)
+  - [ ] Padronizar serviços em `mealService` separado de `aiService`
+  - [ ] Adicionar testes de fluxo (histórico, edição, exclusão, duplicação)
+  - [ ] Melhorar performance com paginação/lazy load no histórico
+
+---
 *Próxima Tarefa Sugerida: Iniciar Épico 1 (Instalação do Vite PWA).*

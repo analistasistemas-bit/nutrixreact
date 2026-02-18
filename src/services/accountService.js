@@ -1,9 +1,9 @@
-import insforge from '../lib/insforge';
+import supabase from '../lib/supabase';
 
 export const RESET_CONFIRMATION_TEXT = 'EXCLUIR MEUS DADOS';
 
 async function getAuthenticatedSession() {
-    const { data, error } = await insforge.auth.getCurrentSession();
+    const { data, error } = await supabase.auth.getSession();
 
     if (error || !data?.session) {
         throw new Error('Sessão expirada. Faça login novamente.');
@@ -18,7 +18,7 @@ async function getAuthenticatedSession() {
 }
 
 async function reauthenticate(email, password) {
-    const { error } = await insforge.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
         throw new Error('Senha inválida. Confirme sua senha para continuar.');
@@ -26,7 +26,7 @@ async function reauthenticate(email, password) {
 }
 
 async function runAtomicResetRpc() {
-    const { data, error } = await insforge.database.rpc('rpc_reset_my_data');
+    const { data, error } = await supabase.rpc('rpc_reset_my_data');
 
     if (error) {
         throw new Error(
@@ -55,7 +55,7 @@ export async function resetAuthenticatedUserData({ password, confirmationText })
         : [];
 
     if (fileKeys.length > 0) {
-        const { error: storageError } = await insforge.storage
+        const { error: storageError } = await supabase.storage
             .from('uploads')
             .remove(fileKeys);
 

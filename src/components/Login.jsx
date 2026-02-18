@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
-import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Activity, CheckCircle, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Activity, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import NutrixoIcon from '../assets/nutrixo-icon-v2.png';
 import { z } from 'zod';
-import insforge from '../lib/insforge';
+import supabase from '../lib/supabase';
 
 const loginSchema = z.object({
     email: z.string().email('E-mail inválido.'),
@@ -21,8 +21,6 @@ const Login = ({ onLogin }) => {
     const [fieldErrors, setFieldErrors] = useState({});
     const [isSuccess, setIsSuccess] = useState(false);
     const [verificationSent, setVerificationSent] = useState(false);
-    const [otp, setOtp] = useState('');
-    const [verifying, setVerifying] = useState(false);
     const [isDev] = useState(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
     const handleLoginSuccess = (userData, token) => {
@@ -31,6 +29,19 @@ const Login = ({ onLogin }) => {
             onLogin(userData, token);
         }, 800);
     };
+
+    // Listener para capturar o callback do Supabase quando o usuário clica no link de confirmação
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+                setVerificationSent(false);
+                handleLoginSuccess(session.user, session.access_token);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const checkValidity = () => {
         const result = loginSchema.safeParse({ email, password });
@@ -65,11 +76,14 @@ const Login = ({ onLogin }) => {
         const attemptAuth = async () => {
             try {
                 if (isSignUp) {
-                    // Sign Up Flow
-                    const { data, error } = await insforge.auth.signUp({
+                    // Sign Up Flow — Supabase
+                    const { data, error } = await supabase.auth.signUp({
                         email,
                         password,
-                        name,
+                        options: {
+                            data: { name },
+                            emailRedirectTo: window.location.origin,
+                        },
                     });
 
                     if (error) {
@@ -78,17 +92,24 @@ const Login = ({ onLogin }) => {
                         return;
                     }
 
-                    if (data?.requireEmailVerification) {
+                    // Supabase: se confirmação de e-mail está ativa, user.identities será vazio
+                    if (data?.user && data.user.identities && data.user.identities.length === 0) {
+                        // Usuário já existe
+                        setError('Este e-mail já está cadastrado. Tente fazer login.');
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    if (data?.user && !data.session) {
+                        // Requer verificação de e-mail — mostra tela de aguardar link
                         setVerificationSent(true);
                         setIsLoading(false);
                         return;
                     }
 
-                    if (data?.accessToken) {
-                        handleLoginSuccess(data.user, data.accessToken);
+                    if (data?.session) {
+                        handleLoginSuccess(data.session.user, data.session.access_token);
                     } else {
-                        // Caso onde o signUp não retorna sessão imediata mas não requer verificação (raro)
-                        // Tentamos login automático
                         await attemptLoginOnly();
                     }
 
@@ -103,15 +124,21 @@ const Login = ({ onLogin }) => {
         };
 
         const attemptLoginOnly = async () => {
-            const { data, error } = await insforge.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
             if (error) {
-                if (error.error === 'INVALID_CREDENTIALS' && isDev) {
+                if (error.message === 'Invalid login credentials' && isDev) {
                     console.warn('DEV: Bypass login simulado');
-                    handleLoginSuccess({ email, name: 'Diego (Dev)' }, null);
+                    handleLoginSuccess({ email, user_metadata: { name: 'Diego (Dev)' } }, null);
+                    return;
+                }
+                // Mensagem amigável para e-mail não confirmado
+                if (error.message === 'Email not confirmed') {
+                    setError('E-mail ainda não confirmado. Verifique sua caixa de entrada e clique no link de confirmação.');
+                    setIsLoading(false);
                     return;
                 }
                 setError(error.message || 'E-mail ou senha incorretos.');
@@ -119,8 +146,8 @@ const Login = ({ onLogin }) => {
                 return;
             }
 
-            if (data) {
-                handleLoginSuccess(data.user, data.accessToken);
+            if (data?.session) {
+                handleLoginSuccess(data.session.user, data.session.access_token);
             }
         };
 
@@ -152,30 +179,6 @@ const Login = ({ onLogin }) => {
         }
     }, [isSignUp]);
 
-
-
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-        setVerifying(true);
-        setError('');
-
-        try {
-            const { data, error } = await insforge.auth.verifyEmail({
-                email,
-                otp: otp,
-            });
-
-            if (error) throw error;
-
-            if (data?.accessToken) {
-                handleLoginSuccess(data.user, data.accessToken);
-            }
-        } catch (err) {
-            setError(err.message || 'Código inválido ou expirado.');
-            setVerifying(false);
-        }
-    };
-
     if (verificationSent) {
         return (
             <div className="min-h-screen w-full bg-black flex items-center justify-center font-sans">
@@ -188,42 +191,38 @@ const Login = ({ onLogin }) => {
                         <Mail className="w-8 h-8 text-cyan-400" />
                     </div>
                     <h2 className="text-2xl font-bold text-white mb-2">Verifique seu e-mail</h2>
-                    <p className="text-zinc-400 mb-6 text-sm">
-                        Enviamos um código de confirmação para <strong className="text-white">{email}</strong>.
-                        Digite o código abaixo para ativar sua conta.
+                    <p className="text-zinc-400 mb-6 text-sm leading-relaxed">
+                        Enviamos um <strong className="text-cyan-400">link de confirmação</strong> para <strong className="text-white">{email}</strong>.
                     </p>
 
-                    <form onSubmit={handleVerifyOtp} className="space-y-4">
-                        <input
-                            type="text"
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-                            placeholder="000000"
-                            className="block w-full text-center py-4 bg-black/40 border border-zinc-700 rounded-xl text-white text-2xl tracking-[0.5em] font-mono focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all outline-none placeholder:tracking-normal placeholder:text-zinc-700"
-                            autoFocus
-                            required
-                        />
+                    <div className="bg-black/40 border border-zinc-700 rounded-xl p-5 mb-6 space-y-3">
+                        <div className="flex items-center gap-3 text-left">
+                            <div className="w-8 h-8 rounded-full bg-cyan-900/40 flex items-center justify-center flex-shrink-0">
+                                <span className="text-cyan-400 font-bold text-sm">1</span>
+                            </div>
+                            <p className="text-zinc-300 text-sm">Abra seu e-mail e procure a mensagem do <strong className="text-white">Supabase Auth</strong></p>
+                        </div>
+                        <div className="flex items-center gap-3 text-left">
+                            <div className="w-8 h-8 rounded-full bg-cyan-900/40 flex items-center justify-center flex-shrink-0">
+                                <span className="text-cyan-400 font-bold text-sm">2</span>
+                            </div>
+                            <p className="text-zinc-300 text-sm">Clique no link <strong className="text-white">"Confirm your mail"</strong></p>
+                        </div>
+                        <div className="flex items-center gap-3 text-left">
+                            <div className="w-8 h-8 rounded-full bg-cyan-900/40 flex items-center justify-center flex-shrink-0">
+                                <span className="text-cyan-400 font-bold text-sm">3</span>
+                            </div>
+                            <p className="text-zinc-300 text-sm">Volte aqui e faça <strong className="text-white">login</strong> com seu e-mail e senha</p>
+                        </div>
+                    </div>
 
-                        {error && (
-                            <p className="text-red-400 text-xs">{error}</p>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={otp.length < 6 || verifying}
-                            className={`w-full py-3 rounded-xl font-bold text-white transition-all ${otp.length === 6 && !verifying
-                                ? 'bg-cyan-600 hover:bg-cyan-500 shadow-lg shadow-cyan-900/20'
-                                : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                                }`}
-                        >
-                            {verifying ? 'Verificando...' : 'Verificar Código'}
-                        </button>
-                    </form>
+                    <p className="text-zinc-600 text-xs mb-4">
+                        Não recebeu? Verifique a pasta de spam ou lixo eletrônico.
+                    </p>
 
                     <button
                         onClick={() => {
                             setVerificationSent(false);
-                            setOtp('');
                             setError('');
                         }}
                         className="mt-6 text-zinc-500 hover:text-zinc-300 text-xs transition-colors"

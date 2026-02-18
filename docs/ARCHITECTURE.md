@@ -22,6 +22,7 @@ src/
 │   └── mocks/      # Dados simulados para desenvolvimento (Exames, Métricas)
 ├── hooks/          # Custom hooks para lógica compartilhada
 ├── layouts/        # Estruturas de página (MainLayout)
+├── lib/            # Clientes e utilitários compartilhados (Supabase, locale numérico)
 ├── pages/          # Páginas principais da aplicação (Dashboard, Labs, Progress)
 ├── services/       # Integrações externas e lógica de negócio
 └── utils/          # Funções auxiliares e formatação
@@ -40,6 +41,25 @@ Gerenciado através de contextos React. Monitora ações do usuário para atuali
 
 ### 3. Visualização de Dados (Progress)
 O dashboard de progresso utiliza o padrão `SentinelCard` para exibir KPIs biométricos. Dados históricos são visualizados via modais de detalhe (`BiomarkerDetailOverlay`) com suporte a tradução dinâmica de categorias.
+
+## 🔢 Padrão Numérico Oficial (pt-BR)
+
+Para evitar erros clínicos de interpretação (`278.000` virar `278`), o sistema adota **pt-BR como padrão oficial** de leitura/formatação numérica.
+
+- **Separador de milhar**: ponto (`.`)
+- **Separador decimal**: vírgula (`,`)
+- **Regra obrigatória**: parsing numérico deve usar `src/lib/numberLocale.js`, nunca `parseFloat` direto em valores vindos de IA/OCR.
+
+Funções padrão:
+- `parsePtBrNumber(value)`: converte texto/número para numérico respeitando formato brasileiro.
+- `formatPtBrNumber(value)`: formata exibição em `pt-BR`.
+- `parsePtBrReferenceRange(referenceText)`: interpreta faixas de referência laboratoriais (`min-max`, `<`, `>`, `até`, `acima de`).
+
+Aplicação atual:
+- `src/services/aiService.js` (normalização de exames e status clínico)
+- `src/pages/Progress.jsx` (cálculos, tendências e filtros)
+- `src/pages/Measurements.jsx` (extração e exibição de medidas)
+- `src/pages/Labs.jsx` (exibição de resultados laboratoriais)
 
 ## 🎨 Design System
 As diretrizes de cores, tipografia e componentes visuais estão documentadas em:

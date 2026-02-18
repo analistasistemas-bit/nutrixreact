@@ -15,6 +15,16 @@ const INITIAL_MACROS = {
     fats: { consumed: 0, goal: 0, unit: 'g' }
 };
 
+const getClinicalCategoryEmoji = (name = '') => {
+    const n = String(name).toLowerCase();
+    if (n.includes('glicose') || n.includes('insulina') || n.includes('hba1c') || n.includes('glicada') || n.includes('homa')) return '🩸';
+    if (n.includes('colesterol') || n.includes('ldl') || n.includes('hdl') || n.includes('triglicer') || n.includes('vldl')) return '❤️';
+    if (n.includes('tsh') || n.includes('t4') || n.includes('testosterona') || n.includes('estradiol') || n.includes('cortisol') || n.includes('horm')) return '🧬';
+    if (n.includes('pcr') || n.includes('vitamina d') || n.includes('hemoglobina') || n.includes('leucócitos') || n.includes('ferritina') || n.includes('proteína c')) return '🛡️';
+    if (n.includes('creatinina') || n.includes('ureia') || n.includes('tgo') || n.includes('tgp') || n.includes('gama gt') || n.includes('bilirrubina')) return '🧪';
+    return '✨';
+};
+
 const Dashboard = () => {
     const navigate = useNavigate();
     const [macroNutrients, setMacroNutrients] = useState(INITIAL_MACROS);
@@ -26,6 +36,7 @@ const Dashboard = () => {
     const [isLoadingInsights, setIsLoadingInsights] = useState(true);
     const [insights, setInsights] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [healthFilter, setHealthFilter] = useState('all'); // 'all' | 'problems'
 
     React.useEffect(() => {
         const fetchHealthData = async () => {
@@ -41,9 +52,7 @@ const Dashboard = () => {
                             value: `${b.value} ${b.unit}`,
                             status: b.status === 'low' ? 'Abaixo do normal' :
                                 b.status === 'high' ? 'Acima do normal' : 'Normal',
-                            emoji: b.name.toLowerCase().includes('vitamina') ? '💊' :
-                                b.name.toLowerCase().includes('ferro') ? '🩸' :
-                                    b.name.toLowerCase().includes('colesterol') ? '⚠️' : '🧪',
+                            emoji: getClinicalCategoryEmoji(b.name),
                             isAlert: b.status === 'low' || b.status === 'high'
                         }));
 
@@ -117,6 +126,17 @@ const Dashboard = () => {
         fetchInsights();
     }, []);
 
+    const filteredHealthMetrics = healthMetrics
+        .filter(metric => metric.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        .filter(metric => (healthFilter === 'problems' ? metric.isAlert : true))
+        .sort((a, b) => {
+            if (a.isAlert && !b.isAlert) return -1;
+            if (!a.isAlert && b.isAlert) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+    const problemCount = healthMetrics.filter(metric => metric.isAlert).length;
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -138,17 +158,36 @@ const Dashboard = () => {
                 >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
                         <h2 className="text-xl font-bold text-zinc-900 dark:text-text-primary whitespace-nowrap">
-                            🧬 Saúde ({healthMetrics.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase())).length})
+                            🧬 Saúde ({filteredHealthMetrics.length})
                         </h2>
-                        <div className="relative flex-1 max-w-md">
-                            <input
-                                type="text"
-                                placeholder="Buscar exame..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-zinc-50 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
-                            />
-                            <TrendingUp className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                            <div className="flex items-center gap-1 p-1.5 bg-zinc-100 dark:bg-bg-secondary rounded-xl border border-zinc-200 dark:border-border-subtle shadow-inner">
+                                {[
+                                    { id: 'all', label: 'Geral' },
+                                    { id: 'problems', label: `Problemas (${problemCount})` }
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setHealthFilter(opt.id)}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${healthFilter === opt.id
+                                            ? 'bg-white dark:bg-zinc-700 text-cyan-600 dark:text-cyan-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
+                                            : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="relative flex-1 max-w-[240px]">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar exame..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-9 pr-3 py-2 bg-zinc-50 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
+                                />
+                                <TrendingUp className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            </div>
                         </div>
                     </div>
                     <div className="space-y-3 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
@@ -157,17 +196,8 @@ const Dashboard = () => {
                                 <div className="w-8 h-8 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
                                 <p className="text-zinc-500 dark:text-text-muted text-sm">Atualizando seus dados...</p>
                             </div>
-                        ) : healthMetrics.length > 0 ? (
-                            healthMetrics
-                                .filter(metric => metric.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                                .sort((a, b) => {
-                                    // Prioridade 1: Alertas (fora do normal)
-                                    if (a.isAlert && !b.isAlert) return -1;
-                                    if (!a.isAlert && b.isAlert) return 1;
-                                    // Prioridade 2: Ordem Alfabética
-                                    return a.name.localeCompare(b.name);
-                                })
-                                .map((metric, index) => (
+                        ) : filteredHealthMetrics.length > 0 ? (
+                            filteredHealthMetrics.map((metric, index) => (
                                     <motion.div
                                         key={index}
                                         initial={{ opacity: 0, y: 10 }}
@@ -191,14 +221,23 @@ const Dashboard = () => {
                                 ))
                         ) : (
                             <div className="text-center py-10 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-dashed border-zinc-200 dark:border-border-subtle">
-                                <HeartPulse className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
-                                <p className="text-zinc-500 dark:text-text-muted text-sm mb-4">Nenhum exame importado ainda</p>
-                                <button
-                                    onClick={() => navigate('/labs')}
-                                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold rounded-lg transition-colors"
-                                >
-                                    Importar Primeiro Exame
-                                </button>
+                                {healthMetrics.length > 0 && healthFilter === 'problems' ? (
+                                    <>
+                                        <HeartPulse className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+                                        <p className="text-zinc-500 dark:text-text-muted text-sm">Nenhum exame com problema no filtro atual.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <HeartPulse className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+                                        <p className="text-zinc-500 dark:text-text-muted text-sm mb-4">Nenhum exame importado ainda</p>
+                                        <button
+                                            onClick={() => navigate('/labs')}
+                                            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold rounded-lg transition-colors"
+                                        >
+                                            Importar Primeiro Exame
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
