@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:py-backend": "cd backend-python && PYTHONWARNINGS=ignore ./.venv/bin/uvicorn app.main:app --reload --reload-exclude '.venv/*' --reload-exclude 'backend-python/.venv/*' --no-access-log --log-level warning --port 8001",
+    "dev:py-backend:stable": "cd backend-python && PYTHONWARNINGS=ignore ./.venv/bin/uvicorn app.main:app --no-access-log --log-level warning --port 8001",
     "build": "vite build",
     "lint": "eslint .",
     "test": "npm run lint && npm run build",

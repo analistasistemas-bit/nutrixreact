@@ -5,12 +5,14 @@ import { analyzeMeasurements, getMeasurementHistory } from '../services/aiServic
 import AIAnalysisPage, { AIAnalysisResults } from '../components/common/AIAnalysisPage';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { formatPtBrNumber, parsePtBrNumber } from '../lib/numberLocale';
+import { buildImportStageNotification, pushNotification } from '../services/notificationService';
 
 const Measurements = () => {
     const [uploadedFile, setUploadedFile] = useState(null);
     const [analysisResult, setAnalysisResult] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [error, setError] = useState(null);
+    const [importProgress, setImportProgress] = useState(null);
     const [history, setHistory] = useState([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
     const [expandedExamId, setExpandedExamId] = useState(null);
@@ -39,16 +41,25 @@ const Measurements = () => {
         setIsAnalyzing(true);
         setError(null);
         setAnalysisResult(null);
+        setImportProgress({ stage: 'queued', percent: 0 });
+        pushNotification(buildImportStageNotification('measurements', 'queued'));
 
         try {
-            const result = await analyzeMeasurements(file);
+            const result = await analyzeMeasurements(file, {
+                onProgress: (progress) => {
+                    setImportProgress(progress);
+                },
+            });
             setAnalysisResult(result.analysis);
+            pushNotification(buildImportStageNotification('measurements', 'completed'));
             addXP('UPLOAD_EXAM');
         } catch (err) {
             console.error('Erro na análise:', err);
             setError(err.message || 'Erro ao analisar as medidas. Tente novamente.');
+            pushNotification(buildImportStageNotification('measurements', 'failed'));
         } finally {
             setIsAnalyzing(false);
+            setImportProgress(null);
         }
     };
 
@@ -79,11 +90,27 @@ const Measurements = () => {
         return { label: 'Analisado', cls: 'bg-green-100 text-green-700' };
     };
 
+    const getLoadingMessage = () => {
+        const stageMap = {
+            queued: 'Na fila',
+            extract: 'Extraindo arquivo',
+            clean: 'Limpando markdown',
+            llm: 'Extraindo medidas com IA',
+            save: 'Salvando resultado',
+            completed: 'Concluído',
+        };
+        if (!importProgress) return 'IA Analisando Medidas...';
+        const label = stageMap[importProgress.stage] || 'Processando';
+        const percent = Number(importProgress.percent || 0);
+        return `${label} (${percent}%)`;
+    };
+
     // Sub-componente para exibir os detalhes da análise (reutilizado no histórico)
     const MeasurementDetailView = ({ analysis }) => {
         // Se a IA não retornar a chave 'measurements', tentamos usar o próprio objeto 'analysis' (fallback para objetos planos)
         // Mas ignoramos chaves padrão como 'summary', 'recommendations', 'bmi'
         const baseData = analysis?.measurements || analysis || {};
+        const ptBrCollator = new Intl.Collator('pt-BR', { sensitivity: 'base', numeric: true });
 
         // Helper recursivo para buscar valor em estruturas aninhadas ou strings com unidade
         const findValue = (obj, targetKey) => {
@@ -175,6 +202,32 @@ const Measurements = () => {
         const allKeys = Object.keys(baseData).filter(k =>
             !['summary', 'recommendations', 'bmi', 'goal', 'previousInjuries', 'trainingDuration', 'trainingFrequency', 'sportsHistory', 'performanceIndicators'].includes(k)
         );
+        const entries = allKeys
+            .map(key => ({ key, data: findValue(baseData, key) }))
+            .filter(({ data }) => data && data.value !== null && data.value !== undefined)
+            .sort((a, b) => {
+                const la = a?.data?.label || getFriendlyLabel(a.key);
+                const lb = b?.data?.label || getFriendlyLabel(b.key);
+                return ptBrCollator.compare(la, lb);
+            });
+
+        const groupedEntries = entries.reduce((acc, entry) => {
+            const unit = String(entry?.data?.unit || '')
+                .toLowerCase()
+                .replace(/[()\s]/g, '');
+            if (unit === 'cm') {
+                acc.circunferencias.push(entry);
+            } else if (unit === 'mm') {
+                acc.dobrasCutaneas.push(entry);
+            } else {
+                acc.geral.push(entry);
+            }
+            return acc;
+        }, {
+            circunferencias: [],
+            dobrasCutaneas: [],
+            geral: [],
+        });
 
         // Helper para extrair valor numérico do IMC caso venha como string
         const parseBMI = (val) => {
@@ -201,7 +254,7 @@ const Measurements = () => {
                                     <h3 className="font-bold text-blue-800 dark:text-blue-400 text-sm uppercase">IMC</h3>
                                 </div>
                                 <p className={`text-4xl font-black ${getBMIColor(bmiValue)}`}>
-                                    {bmiValue}
+                                    {formatPtBrNumber(bmiValue)}
                                 </p>
                             </div>
                             <div className="text-right">
@@ -210,7 +263,7 @@ const Measurements = () => {
                                 </p>
                                 {analysis.waistHipRatio && (
                                     <p className="text-[10px] text-gray-500 dark:text-text-muted mt-1 font-medium">
-                                        Cintura/Quadril: {typeof analysis.waistHipRatio === 'string' ? analysis.waistHipRatio : analysis.waistHipRatio.value}
+                                        Cintura/Quadril: {typeof analysis.waistHipRatio === 'string' ? analysis.waistHipRatio : formatPtBrNumber(analysis.waistHipRatio.value)}
                                         {analysis.waistHipRatio.classification ? ` (${analysis.waistHipRatio.classification})` : ''}
                                     </p>
                                 )}
@@ -225,32 +278,38 @@ const Measurements = () => {
                     <h3 className="font-black text-xs uppercase tracking-widest text-blue-700 dark:text-blue-400">Medidas Extraídas</h3>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                    {allKeys
-                        .map(key => ({ key, data: findValue(baseData, key) }))
-                        .filter(({ data }) => data && data.value !== null && data.value !== undefined)
-                        .sort((a, b) => getFriendlyLabel(a.key).localeCompare(getFriendlyLabel(b.key)))
-                        .map(({ key, data }, idx) => (
-                            <motion.div
-                                key={key}
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: idx * 0.05 }}
-                                className="bg-white dark:bg-bg-elevated border border-gray-100 dark:border-border-subtle rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow text-center"
-                            >
-                                <p className="text-[9px] font-black text-gray-400 dark:text-text-muted mb-2 uppercase tracking-widest">
-                                    {getFriendlyLabel(key)}
-                                </p>
-                                <p className="text-2xl font-black text-gray-900 dark:text-text-primary">
-                                    {typeof data.value === 'number' ? formatPtBrNumber(data.value) : data.value}
-                                </p>
-                                <p className="text-[10px] font-bold text-blue-500/70 dark:text-blue-400/50 mt-1 uppercase">
-                                    {data.unit}
-                                </p>
-                            </motion.div>
-                        ))
-                    }
-                </div>
+                {[
+                    { id: 'circunferencias', title: 'Circunferências', items: groupedEntries.circunferencias },
+                    { id: 'dobras-cutaneas', title: 'Dobras Cutâneas', items: groupedEntries.dobrasCutaneas },
+                    { id: 'geral', title: 'Geral', items: groupedEntries.geral },
+                ].filter(section => section.items.length > 0).map(section => (
+                    <div key={section.id} className="mb-6">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-gray-500 dark:text-text-muted mb-3">
+                            {section.title}
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {section.items.map(({ key, data }, idx) => (
+                                <motion.div
+                                    key={`${section.id}-${key}`}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: idx * 0.03 }}
+                                    className="bg-white dark:bg-bg-elevated border border-gray-100 dark:border-border-subtle rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow text-center"
+                                >
+                                    <p className="text-[9px] font-black text-gray-400 dark:text-text-muted mb-2 uppercase tracking-widest">
+                                        {data?.label || getFriendlyLabel(key)}
+                                    </p>
+                                    <p className="text-2xl font-black text-gray-900 dark:text-text-primary">
+                                        {typeof data.value === 'number' ? formatPtBrNumber(data.value) : data.value}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-blue-500/70 dark:text-blue-400/50 mt-1 uppercase">
+                                        {data.unit}
+                                    </p>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
 
                 {/* Summary */}
                 {analysis?.summary && (
@@ -276,10 +335,10 @@ const Measurements = () => {
                 <AIAnalysisPage.UploadZone
                     onUpload={handleFileUpload}
                     uploadedFile={uploadedFile}
-                    accept=".pdf,.jpg,.jpeg,.png"
+                    accept=".pdf"
                 />
 
-                <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message="IA Analisando Medidas..." />
+                <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message={getLoadingMessage()} />
                 <AIAnalysisPage.Error error={error} onReset={resetUpload} />
 
                 {/* Current Analysis Result */}
@@ -351,7 +410,7 @@ const Measurements = () => {
                                                     {exam.analysis?.bmi && (
                                                         <>
                                                             <span>•</span>
-                                                            <span className="font-medium">IMC {exam.analysis.bmi.value}</span>
+                                                            <span className="font-medium">IMC {formatPtBrNumber(exam.analysis.bmi.value)}</span>
                                                         </>
                                                     )}
                                                 </div>

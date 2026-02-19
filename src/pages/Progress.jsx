@@ -30,7 +30,7 @@ import {
 import { getExamHistory, getMeasurementHistory } from '../services/aiService';
 import BiomarkerDetailDrawer from '../components/BiomarkerDetailDrawer';
 import { useGamification } from '../hooks/useGamification';
-import { parsePtBrNumber, parsePtBrReferenceRange } from '../lib/numberLocale';
+import { formatPtBrNumber, parsePtBrNumber, parsePtBrReferenceRange } from '../lib/numberLocale';
 
 // --- Sub-componente: InsightDrawer (Painel Lateral Contextual) ---
 const InsightDrawer = ({ isOpen, onClose }) => {
@@ -317,7 +317,7 @@ const getSentinelAnalysis = (marker) => {
     const previous = parsePtBrNumber(marker.history[marker.history.length - 2].value);
     const diff = current - previous;
     const absDiff = Math.abs(diff);
-    const percentChange = ((diff / previous) * 100).toFixed(1);
+    const percentChange = formatPtBrNumber((diff / previous) * 100);
 
     // Identificar contexto do marcador
     const lowerIsBetter = ['weight', 'bodyFat', 'visceralFat', 'imc', 'cholesterol', 'triglycerides', 'glucose', 'intrep'].some(key =>
@@ -335,20 +335,20 @@ const getSentinelAnalysis = (marker) => {
     } else if (diff > 0) {
         // Subiu
         if (lowerIsBetter) {
-            trendText = `Alerta de Elevação. Houve um aumento de ${absDiff.toFixed(1)}${marker.unit} (${percentChange}%) desde o último registro. Recomendamos revisão de hábitos recentes.`;
+            trendText = `Alerta de Elevação. Houve um aumento de ${formatPtBrNumber(absDiff)}${marker.unit} (${percentChange}%) desde o último registro. Recomendamos revisão de hábitos recentes.`;
         } else if (higherIsBetter) {
-            trendText = `Progresso Confirmado! O aumento de ${absDiff.toFixed(1)}${marker.unit} (${percentChange}%) reflete uma adaptação positiva do seu organismo.`;
+            trendText = `Progresso Confirmado! O aumento de ${formatPtBrNumber(absDiff)}${marker.unit} (${percentChange}%) reflete uma adaptação positiva do seu organismo.`;
         } else {
             trendText = `Observamos uma elevação de ${percentChange}%. A IA continuará monitorando para estabelecer se é uma flutuação pontual ou tendência.`;
         }
     } else {
         // Desceu
         if (lowerIsBetter) {
-            trendText = `Excelente! Redução de ${absDiff.toFixed(1)}${marker.unit} (${Math.abs(percentChange)}%) detectada. Você está na direção certa.`;
+            trendText = `Excelente! Redução de ${formatPtBrNumber(absDiff)}${marker.unit} (${formatPtBrNumber(Math.abs(diff / previous * 100))}%) detectada. Você está na direção certa.`;
         } else if (higherIsBetter) {
-            trendText = `Atenção à Queda. Houve uma redução de ${absDiff.toFixed(1)}${marker.unit}. Verifique nutrição e recuperação para reverter este quadro.`;
+            trendText = `Atenção à Queda. Houve uma redução de ${formatPtBrNumber(absDiff)}${marker.unit}. Verifique nutrição e recuperação para reverter este quadro.`;
         } else {
-            trendText = `Registramos uma redução de ${Math.abs(percentChange)}%. Monitoramento contínuo ativo.`;
+            trendText = `Registramos uma redução de ${formatPtBrNumber(Math.abs(diff / previous * 100))}%. Monitoramento contínuo ativo.`;
         }
     }
 
@@ -535,7 +535,7 @@ const formatDisplayValue = (val) => {
     if (val === null || val === undefined || val === '') return '--';
     const num = typeof val === 'string' ? parseNumberVal(val) : val;
     if (num === null || isNaN(num)) return val; // Retorna original se não for número
-    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(num);
+    return formatPtBrNumber(num);
 };
 
 const parseReferenceRange = (refString) => {
@@ -1064,6 +1064,7 @@ const Progress = () => {
 
     const physicalCards = React.useMemo(() => {
         if (!measurements.length) return null;
+        const ptBrCollator = new Intl.Collator('pt-BR', { sensitivity: 'base', numeric: true });
 
         const uniqueMeasurementKeys = new Set();
         measurements.forEach(m => {
@@ -1194,44 +1195,80 @@ const Progress = () => {
                     const bPrio = b.status === 'ATENÇÃO' ? 1 : 2;
                     if (aPrio !== bPrio) return aPrio - bPrio;
                 }
-                return a.label.localeCompare(b.label);
+                return ptBrCollator.compare(a.label, b.label);
             });
 
-        return cards.map(({ key, label, meta, biomarkerData, displayValue, lastData, status }) => (
-            <div key={key} className="p-8 bg-zinc-50/50 dark:bg-bg-secondary rounded-[3rem] border border-zinc-200 dark:border-border-subtle space-y-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-white dark:bg-bg-elevated rounded-2xl shadow-sm">
-                            <meta.icon className="w-5 h-5" style={{ color: meta.color }} />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">{label}</h3>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider ${status === 'EXCELENTE' || status === 'NORMAL' ? 'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-400' :
-                            status === 'ATENÇÃO' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' :
-                                'bg-zinc-100 text-zinc-600 dark:bg-zinc-500/10 dark:text-zinc-400'
-                            }`}>
-                            {status}
-                        </span>
-                    </div>
-                </div>
+        const grouped = cards.reduce((acc, card) => {
+            const unit = String(card?.lastData?.unit || '')
+                .toLowerCase()
+                .replace(/[()\s]/g, '');
 
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-4xl font-bold dark:text-white">{displayValue}</span>
-                            <span className="text-sm text-zinc-400 font-medium">{lastData.unit}</span>
+            if (unit === 'cm') {
+                acc.circunferencias.push(card);
+            } else if (unit === 'mm') {
+                acc.dobrasCutaneas.push(card);
+            } else {
+                acc.geral.push(card);
+            }
+            return acc;
+        }, {
+            circunferencias: [],
+            dobrasCutaneas: [],
+            geral: [],
+        });
+
+        const sections = [
+            { id: 'circunferencias', title: 'Circunferências', items: grouped.circunferencias },
+            { id: 'dobras-cutaneas', title: 'Dobras Cutâneas', items: grouped.dobrasCutaneas },
+            { id: 'geral', title: 'Geral', items: grouped.geral },
+        ].filter(section => section.items.length > 0);
+
+        return sections.map(section => (
+            <div key={section.id} className="col-span-full space-y-4 mb-8">
+                <div className="flex items-center gap-2 px-2">
+                    <div className="h-px flex-1 bg-zinc-100 dark:bg-border-subtle" />
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">{section.title}</h4>
+                    <div className="h-px flex-1 bg-zinc-100 dark:bg-border-subtle" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {section.items.map(({ key, label, meta, biomarkerData, displayValue, lastData, status }) => (
+                        <div key={key} className="p-8 bg-zinc-50/50 dark:bg-bg-secondary rounded-[3rem] border border-zinc-200 dark:border-border-subtle space-y-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 bg-white dark:bg-bg-elevated rounded-2xl shadow-sm">
+                                        <meta.icon className="w-5 h-5" style={{ color: meta.color }} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">{label}</h3>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider ${status === 'EXCELENTE' || status === 'NORMAL' ? 'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-400' :
+                                        status === 'ATENÇÃO' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' :
+                                            'bg-zinc-100 text-zinc-600 dark:bg-zinc-500/10 dark:text-zinc-400'
+                                        }`}>
+                                        {status}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-4xl font-bold dark:text-white">{displayValue}</span>
+                                        <span className="text-sm text-zinc-400 font-medium">{lastData.unit}</span>
+                                    </div>
+                                    <p className="text-xs text-zinc-500 mt-1">Última atualização em {lastData.date}</p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedBiomarker(biomarkerData)}
+                                    className="flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded-2xl text-xs font-bold hover:opacity-90 transition-opacity"
+                                >
+                                    Ver Histórico Completo
+                                </button>
+                            </div>
                         </div>
-                        <p className="text-xs text-zinc-500 mt-1">Última atualização em {lastData.date}</p>
-                    </div>
-                    <button
-                        onClick={() => setSelectedBiomarker(biomarkerData)}
-                        className="flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded-2xl text-xs font-bold hover:opacity-90 transition-opacity"
-                    >
-                        Ver Histórico Completo
-                    </button>
+                    ))}
                 </div>
             </div>
         ));

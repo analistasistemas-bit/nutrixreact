@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Target, X, Calendar, Activity, ArrowUpRight, ArrowDownRight, Minus, Info, History } from 'lucide-react';
+import { formatPtBrNumber } from '../lib/numberLocale';
 
 const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
     if (!biomarker) return null;
@@ -58,7 +59,7 @@ const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
                                     <h2 className="text-5xl font-mono font-bold dark:text-white tracking-tighter">
                                         {biomarker.trend[biomarker.trend.length - 1]?.details ?
                                             `${biomarker.trend[biomarker.trend.length - 1].details.left} / ${biomarker.trend[biomarker.trend.length - 1].details.right}` :
-                                            biomarker.value}
+                                            formatPtBrNumber(biomarker.value)}
                                     </h2>
                                     <span className="text-lg text-zinc-400 font-medium">{biomarker.unit}</span>
                                 </div>
@@ -75,7 +76,7 @@ const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
                                     <div>
                                         <h4 className="text-sm font-bold dark:text-white mb-1">Faixa de Referência</h4>
                                         <p className="text-xs text-zinc-500 leading-relaxed">
-                                            O valor ideal para este marcador está entre <span className="font-mono font-bold dark:text-zinc-300">{biomarker.target[0] ?? 0}</span> e <span className="font-mono font-bold dark:text-zinc-300">{biomarker.target[1] ?? '∞'}</span> {biomarker.unit}.
+                                            O valor ideal para este marcador está entre <span className="font-mono font-bold dark:text-zinc-300">{biomarker.target[0] === null ? '0,00' : formatPtBrNumber(biomarker.target[0])}</span> e <span className="font-mono font-bold dark:text-zinc-300">{biomarker.target[1] === null ? '∞' : formatPtBrNumber(biomarker.target[1])}</span> {biomarker.unit}.
                                             Seus resultados são comparados com protocolos de saúde funcional.
                                         </p>
                                     </div>
@@ -104,7 +105,7 @@ const BiomarkerDetailDrawer = ({ isOpen, onClose, biomarker }) => {
                                                         <td className="px-4 py-3 font-bold dark:text-white">
                                                             {point.details ?
                                                                 <span className="text-xs">E: {point.details.left} / D: {point.details.right}</span> :
-                                                                point.value
+                                                                formatPtBrNumber(point.value)
                                                             } <span className="text-[10px] text-zinc-400 font-normal">{point.unit}</span>
                                                         </td>
                                                     </tr>

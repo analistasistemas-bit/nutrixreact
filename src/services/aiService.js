@@ -9,9 +9,15 @@ import { parsePtBrNumber, parsePtBrReferenceRange } from '../lib/numberLocale';
 // Usa worker local empacotado pelo Vite (evita CDN, 404 e bloqueio de CSP para fake worker/blob).
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-const AI_MODEL = 'meta/llama-3.2-11b-vision-instruct';
-// Usamos o proxy do Vite (/nv-api) para evitar erro de CORS no browser
+const AI_MODEL = import.meta.env.VITE_AI_MODEL || 'meta/llama-3.2-11b-vision-instruct';
+const AI_FALLBACK_MODEL = import.meta.env.VITE_AI_FALLBACK_MODEL || AI_MODEL;
+const IMPORT_OCR_MODEL =
+    import.meta.env.VITE_IMPORT_OCR_MODEL ||
+    import.meta.env.VITE_NVIDIA_IMPORT_MODEL || // compatibilidade retroativa
+    AI_MODEL;
 const NVIDIA_API_URL = '/nv-api/v1/chat/completions';
+const IMPORT_BACKEND_API_BASE = import.meta.env.VITE_IMPORT_BACKEND_URL || '/py-api';
+const IMPORT_USE_BACKEND = import.meta.env.VITE_IMPORT_USE_BACKEND !== 'false';
 
 // ============================================================
 // 🛡️ SECURITY HELPERS
@@ -89,7 +95,7 @@ function getNvidiaApiKey() {
 }
 
 /**
- * Chamada universal à NVIDIA API — substitui insforge.ai.chat.completions.create
+ * Chamada universal à NVIDIA API
  */
 async function createChatCompletion({ model = AI_MODEL, messages, stream = false }) {
     const apiKey = getNvidiaApiKey();
@@ -103,13 +109,15 @@ async function createChatCompletion({ model = AI_MODEL, messages, stream = false
         stream: stream,
     };
 
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': stream ? 'text/event-stream' : 'application/json',
+    };
+
     const response = await fetch(NVIDIA_API_URL, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-            'Accept': stream ? 'text/event-stream' : 'application/json',
-        },
+        headers,
         body: JSON.stringify(body),
     });
 
@@ -123,6 +131,35 @@ async function createChatCompletion({ model = AI_MODEL, messages, stream = false
     }
 
     return await response.json();
+}
+
+async function* streamChatCompletion(response) {
+    const reader = response.body?.getReader?.();
+    if (!reader) return;
+
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line || !line.startsWith('data:')) continue;
+            const data = line.slice(5).trim();
+            if (!data || data === '[DONE]') continue;
+            try {
+                yield JSON.parse(data);
+            } catch {
+                // Ignore malformed SSE line
+            }
+        }
+    }
 }
 
 async function mapWithConcurrency(items, limit, worker) {
@@ -142,6 +179,83 @@ async function mapWithConcurrency(items, limit, worker) {
 
     await Promise.all(Array.from({ length: concurrency }, () => runWorker()));
     return results;
+}
+
+async function createBackendImportJob(kind, file, userEmail) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('user_email', userEmail);
+
+    const response = await fetch(`${IMPORT_BACKEND_API_BASE}/api/import/${kind}`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Import backend error (${response.status}): ${text}`);
+    }
+
+    return await response.json();
+}
+
+async function waitBackendImportJob(kind, jobId, timeoutMs = 15 * 60 * 1000, onProgress = null) {
+    const start = Date.now();
+    let notFoundStreak = 0;
+
+    while (Date.now() - start < timeoutMs) {
+        const response = await fetch(`${IMPORT_BACKEND_API_BASE}/api/import/${kind}/${jobId}?t=${Date.now()}`, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, max-age=0',
+                Pragma: 'no-cache',
+            },
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            if (response.status === 404) {
+                notFoundStreak += 1;
+                // Em restart do backend, o job pode levar alguns segundos para reaparecer via persistência.
+                if (notFoundStreak <= 15) {
+                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                    continue;
+                }
+                throw new Error('Processamento reiniciado no servidor. Recarregando status...');
+            }
+            throw new Error(`Import status error (${response.status}): ${text}`);
+        }
+        notFoundStreak = 0;
+
+        const payload = await response.json();
+        const status = String(payload?.status || '').toLowerCase();
+        const stage = payload?.progress?.stage || 'queued';
+        const percent = Number(payload?.progress?.percent || 0);
+        console.log(`[import][${kind}] job=${jobId} status=${status} stage=${stage} percent=${percent}`);
+        if (typeof onProgress === 'function') {
+            onProgress(payload?.progress || { stage, percent });
+        }
+
+        if (status === 'completed') {
+            return payload?.result || {};
+        }
+
+        if (status === 'failed') {
+            throw new Error(payload?.error || 'Falha no processamento do backend.');
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    throw new Error('Timeout no processamento do backend. Tente novamente.');
+}
+
+async function analyzeImportViaBackend(kind, file, userEmail, onProgress = null) {
+    const created = await createBackendImportJob(kind, file, userEmail);
+    if (!created?.job_id) {
+        throw new Error('Backend não retornou job_id para importação.');
+    }
+    return await waitBackendImportJob(kind, created.job_id, 15 * 60 * 1000, onProgress);
 }
 
 // ============================================================
@@ -761,9 +875,25 @@ Retorne APENAS o JSON.`
 // ============================================================
 // 🧪 EXAMS - Analyze blood test PDFs
 // ============================================================
-export async function analyzeExam(file) {
+export async function analyzeExam(file, options = {}) {
     validateFile(file);
     const userEmail = await getAuthenticatedEmail();
+
+    if (IMPORT_USE_BACKEND) {
+        try {
+            const backendResult = await analyzeImportViaBackend('exams', file, userEmail, options?.onProgress);
+            if (typeof options?.onProgress === 'function') {
+                options.onProgress({ stage: 'completed', percent: 100 });
+            }
+            return {
+                id: backendResult?.id || null,
+                analysis: backendResult?.analysis || {},
+            };
+        } catch (error) {
+            const normalizedError = normalizeAnalysisError(error, 'Erro ao analisar o exame no backend.');
+            throw new Error(normalizedError);
+        }
+    }
 
     const uploadData = await uploadFileToStorage(file, 'exams');
     const fileUrl = getPublicUrl(uploadData.path);
@@ -793,7 +923,7 @@ export async function analyzeExam(file) {
 
     try {
         // 3. Analyze with AI via NVIDIA API
-        console.log('🔍 [DEBUG] Model:', AI_MODEL);
+        console.log('🔍 [DEBUG] Import OCR Model:', IMPORT_OCR_MODEL);
         console.log('🔍 [DEBUG] Enviando', images.length, 'página(s) para análise (1 por requisição)...');
 
         const messages = [
@@ -850,7 +980,7 @@ Retorne SOMENTE o JSON. Sem markdown, sem backticks.`
             ];
 
             const completion = await createChatCompletion({
-                model: AI_MODEL,
+                model: IMPORT_OCR_MODEL,
                 messages: pageMessages,
             });
             const responseText = completion.choices[0].message.content;
@@ -898,9 +1028,25 @@ Retorne SOMENTE o JSON. Sem markdown, sem backticks.`
 // ============================================================
 // 📏 MEASUREMENTS - Analyze body measurement PDFs
 // ============================================================
-export async function analyzeMeasurements(file) {
+export async function analyzeMeasurements(file, options = {}) {
     validateFile(file);
     const userEmail = await getAuthenticatedEmail();
+
+    if (IMPORT_USE_BACKEND) {
+        try {
+            const backendResult = await analyzeImportViaBackend('measurements', file, userEmail, options?.onProgress);
+            if (typeof options?.onProgress === 'function') {
+                options.onProgress({ stage: 'completed', percent: 100 });
+            }
+            return {
+                id: backendResult?.id || null,
+                analysis: backendResult?.analysis || {},
+            };
+        } catch (error) {
+            const normalizedError = normalizeAnalysisError(error, 'Erro ao analisar as medidas no backend.');
+            throw new Error(normalizedError);
+        }
+    }
 
     const uploadData = await uploadFileToStorage(file, 'measurements');
     const fileUrl = getPublicUrl(uploadData.path);
@@ -974,7 +1120,7 @@ REGRAS:
             ];
 
             const completion = await createChatCompletion({
-                model: AI_MODEL,
+                model: IMPORT_OCR_MODEL,
                 messages: pageMessages,
             });
 
@@ -1013,9 +1159,25 @@ REGRAS:
 // ============================================================
 // 📋 NUTRITION PLAN - Analyze and generate recipes
 // ============================================================
-export async function analyzeNutritionPlan(file) {
+export async function analyzeNutritionPlan(file, options = {}) {
     validateFile(file);
     const userEmail = await getAuthenticatedEmail();
+
+    if (IMPORT_USE_BACKEND) {
+        try {
+            const backendResult = await analyzeImportViaBackend('plans', file, userEmail, options?.onProgress);
+            if (typeof options?.onProgress === 'function') {
+                options.onProgress({ stage: 'completed', percent: 100 });
+            }
+            return {
+                id: backendResult?.id || null,
+                analysis: backendResult?.analysis || {},
+            };
+        } catch (error) {
+            const normalizedError = normalizeAnalysisError(error, 'Erro ao analisar o plano no backend.');
+            throw new Error(normalizedError);
+        }
+    }
 
     const uploadData = await uploadFileToStorage(file, 'plans');
     const fileUrl = getPublicUrl(uploadData.path);
@@ -1086,7 +1248,7 @@ Retorne APENAS o JSON.`
             ];
 
             const completion = await createChatCompletion({
-                model: AI_MODEL,
+                model: IMPORT_OCR_MODEL,
                 messages: pageMessages,
             });
 
@@ -1328,13 +1490,22 @@ IMPORTANTE: Sempre lembre que você não substitui um profissional de saúde.`
     };
 
     // Para streaming, retorna a response do fetch
-    const response = await createChatCompletion({
-        model: AI_MODEL,
-        messages: [systemMessage, ...messages],
-        stream: true,
-    });
-
-    return response;
+    try {
+        const response = await createChatCompletion({
+            model: AI_MODEL,
+            messages: [systemMessage, ...messages],
+            stream: true,
+        });
+        return streamChatCompletion(response);
+    } catch (error) {
+        console.warn(`[chat] Falha no modelo principal (${AI_MODEL}), aplicando fallback:`, error?.message || error);
+        const fallbackResponse = await createChatCompletion({
+            model: AI_FALLBACK_MODEL,
+            messages: [systemMessage, ...messages],
+            stream: true,
+        });
+        return streamChatCompletion(fallbackResponse);
+    }
 }
 
 // ============================================================
@@ -1521,6 +1692,7 @@ function buildInsightsFallbackFromFacts(facts = []) {
 }
 
 export async function generateHealthInsights() {
+    let factsCache = [];
     try {
         await getAuthenticatedEmail();
 
@@ -1541,6 +1713,7 @@ export async function generateHealthInsights() {
 
         // 2. Preparar fatos reais e validados para IA (evita alucinação)
         const facts = buildInsightFacts({ latestExam, measurement, plan, todayMeals });
+        factsCache = facts;
         if (facts.length === 0) return [];
 
         // 3. Chamar IA para sintetizar insights APENAS dos fatos existentes
@@ -1605,7 +1778,7 @@ export async function generateHealthInsights() {
 
     } catch (error) {
         console.error("Erro ao gerar insights por IA:", error);
-        return [];
+        return factsCache.length > 0 ? buildInsightsFallbackFromFacts(factsCache) : [];
     }
 }
 

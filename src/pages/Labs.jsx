@@ -4,12 +4,15 @@ import { useGamification } from '../hooks/useGamification';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { analyzeExam, getExamHistory } from '../services/aiService';
 import AIAnalysisPage, { AIAnalysisResults } from '../components/common/AIAnalysisPage';
+import { buildImportStageNotification, pushNotification } from '../services/notificationService';
+import { formatPtBrNumber } from '../lib/numberLocale';
 
 const Labs = () => {
     const [uploadedFile, setUploadedFile] = useState(null);
     const [analysisResult, setAnalysisResult] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [error, setError] = useState(null);
+    const [importProgress, setImportProgress] = useState(null);
     const [history, setHistory] = useState([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
     const [expandedExamId, setExpandedExamId] = useState(null);
@@ -38,16 +41,25 @@ const Labs = () => {
         setIsAnalyzing(true);
         setError(null);
         setAnalysisResult(null);
+        setImportProgress({ stage: 'queued', percent: 0 });
+        pushNotification(buildImportStageNotification('exams', 'queued'));
 
         try {
-            const result = await analyzeExam(file);
+            const result = await analyzeExam(file, {
+                onProgress: (progress) => {
+                    setImportProgress(progress);
+                },
+            });
             setAnalysisResult(result.analysis);
+            pushNotification(buildImportStageNotification('exams', 'completed'));
             addXP('UPLOAD_EXAM');
         } catch (err) {
             console.error('Erro na análise:', err);
             setError(err.message || 'Erro ao analisar o exame. Tente novamente.');
+            pushNotification(buildImportStageNotification('exams', 'failed'));
         } finally {
             setIsAnalyzing(false);
+            setImportProgress(null);
         }
     };
 
@@ -79,8 +91,7 @@ const Labs = () => {
 
     const formatBiomarkerValue = (value) => {
         if (value === null || value === undefined || value === '') return '--';
-        if (typeof value !== 'number') return value;
-        return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
+        return formatPtBrNumber(value);
     };
 
     const getImportStatusBadge = (status) => {
@@ -93,9 +104,30 @@ const Labs = () => {
         return { label: 'Analisado', cls: 'bg-green-100 text-green-700' };
     };
 
+    const getLoadingMessage = () => {
+        const stageMap = {
+            queued: 'Na fila',
+            extract: 'Extraindo arquivo',
+            clean: 'Limpando markdown',
+            llm: 'Extraindo indicadores com IA',
+            save: 'Salvando resultado',
+            completed: 'Concluído',
+        };
+        if (!importProgress) return 'IA Analisando seu Exame...';
+        const label = stageMap[importProgress.stage] || 'Processando';
+        const percent = Number(importProgress.percent || 0);
+        return `${label} (${percent}%)`;
+    };
+
     // Reusable component to render analysis details
-    const AnalysisDetailView = ({ analysis }) => (
-        <AIAnalysisResults show={true}>
+    const AnalysisDetailView = ({ analysis }) => {
+        const ptBrCollator = new Intl.Collator('pt-BR', { sensitivity: 'base', numeric: true });
+        const biomarkers = [...(analysis?.biomarkers || [])].sort((a, b) =>
+            ptBrCollator.compare(a?.name || '', b?.name || '')
+        );
+
+        return (
+            <AIAnalysisResults show={true}>
             {/* Summary */}
             {analysis?.summary && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-4">
@@ -107,7 +139,7 @@ const Labs = () => {
             {/* Biomarkers */}
             <h3 className="font-bold text-xl text-cyan-700 dark:text-cyan-400 mt-4">📊 Biomarcadores</h3>
             <div className="space-y-3">
-                {analysis?.biomarkers?.map((biomarker, idx) => (
+                {biomarkers.map((biomarker, idx) => (
                     <motion.div
                         key={idx}
                         initial={{ opacity: 0, x: -10 }}
@@ -144,8 +176,9 @@ const Labs = () => {
                     </ul>
                 </div>
             )}
-        </AIAnalysisResults>
-    );
+            </AIAnalysisResults>
+        );
+    };
 
     return (
         <div className="space-y-8 pb-20">
@@ -161,10 +194,10 @@ const Labs = () => {
                 <AIAnalysisPage.UploadZone
                     onUpload={handleFileUpload}
                     uploadedFile={uploadedFile}
-                    accept=".pdf,.jpg,.jpeg,.png"
+                    accept=".pdf"
                 />
 
-                <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message="IA Analisando seu Exame..." />
+                <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message={getLoadingMessage()} />
                 <AIAnalysisPage.Error error={error} onReset={resetUpload} />
 
                 {/* Current Analysis Result */}

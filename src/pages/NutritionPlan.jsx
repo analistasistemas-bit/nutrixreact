@@ -3,6 +3,8 @@ import { ClipboardList, UtensilsCrossed, CheckCircle } from 'lucide-react';
 import { useGamification } from '../hooks/useGamification';
 import { analyzeNutritionPlan } from '../services/aiService';
 import AIAnalysisPage from '../components/common/AIAnalysisPage';
+import { buildImportStageNotification, pushNotification } from '../services/notificationService';
+import { formatPtBrNumber } from '../lib/numberLocale';
 
 const NutritionPlan = () => {
     const { addXP } = useGamification();
@@ -11,6 +13,7 @@ const NutritionPlan = () => {
     const [analysisResult, setAnalysisResult] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [error, setError] = useState(null);
+    const [importProgress, setImportProgress] = useState(null);
 
     const handleFileUpload = async (event) => {
         const file = event.target.files[0];
@@ -20,16 +23,25 @@ const NutritionPlan = () => {
         setIsAnalyzing(true);
         setError(null);
         setAnalysisResult(null);
+        setImportProgress({ stage: 'queued', percent: 0 });
+        pushNotification(buildImportStageNotification('plans', 'queued'));
 
         try {
-            const result = await analyzeNutritionPlan(file);
+            const result = await analyzeNutritionPlan(file, {
+                onProgress: (progress) => {
+                    setImportProgress(progress);
+                },
+            });
             setAnalysisResult(result.analysis);
+            pushNotification(buildImportStageNotification('plans', 'completed'));
             addXP('UPLOAD_PLAN');
         } catch (err) {
             console.error('Erro na análise:', err);
             setError(err.message || 'Erro ao analisar o plano. Tente novamente.');
+            pushNotification(buildImportStageNotification('plans', 'failed'));
         } finally {
             setIsAnalyzing(false);
+            setImportProgress(null);
         }
     };
 
@@ -37,6 +49,27 @@ const NutritionPlan = () => {
         setUploadedFile(null);
         setAnalysisResult(null);
         setError(null);
+    };
+
+    const getLoadingMessage = () => {
+        const stageMap = {
+            queued: 'Na fila',
+            extract: 'Extraindo arquivo',
+            clean: 'Limpando markdown',
+            llm: 'Extraindo plano com IA',
+            save: 'Salvando resultado',
+            completed: 'Concluído',
+        };
+        if (!importProgress) return 'IA Analisando Plano...';
+        const label = stageMap[importProgress.stage] || 'Processando';
+        const percent = Number(importProgress.percent || 0);
+        return `${label} (${percent}%)`;
+    };
+
+    const formatValue = (value) => {
+        if (value === null || value === undefined || value === '') return '--';
+        if (typeof value === 'number') return formatPtBrNumber(value);
+        return value;
     };
 
     return (
@@ -48,14 +81,14 @@ const NutritionPlan = () => {
                 gradient="from-cyan-500 to-blue-600"
             />
 
-            <AIAnalysisPage.UploadZone
-                onUpload={handleFileUpload}
-                uploadedFile={uploadedFile}
-                accept=".pdf,.docx"
-                label="Selecionar Plano Alimentar"
-            />
+                <AIAnalysisPage.UploadZone
+                    onUpload={handleFileUpload}
+                    uploadedFile={uploadedFile}
+                    accept=".pdf"
+                    label="Selecionar PDF do Plano Alimentar"
+                />
 
-            <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message="IA Analisando Plano..." gradient="bg-cyan-500" />
+            <AIAnalysisPage.Loading isAnalyzing={isAnalyzing} message={getLoadingMessage()} gradient="bg-cyan-500" />
             <AIAnalysisPage.Error error={error} onReset={resetUpload} />
 
             <AIAnalysisPage.Results show={!!analysisResult}>
@@ -77,20 +110,20 @@ const NutritionPlan = () => {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="bg-white dark:bg-bg-secondary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                 <p className="text-xs text-gray-500 dark:text-text-muted">Calorias</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-text-primary">{analysisResult.dailyMacros.calories}</p>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-text-primary">{formatValue(analysisResult.dailyMacros.calories)}</p>
                                 <p className="text-xs text-gray-400">kcal</p>
                             </div>
                             <div className="bg-white dark:bg-bg-secondary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                 <p className="text-xs text-gray-500 dark:text-text-muted">🥩 Proteínas</p>
-                                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{analysisResult.dailyMacros.protein}g</p>
+                                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatValue(analysisResult.dailyMacros.protein)}g</p>
                             </div>
                             <div className="bg-white dark:bg-bg-secondary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                 <p className="text-xs text-gray-500 dark:text-text-muted">🍞 Carboidratos</p>
-                                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysisResult.dailyMacros.carbs}g</p>
+                                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatValue(analysisResult.dailyMacros.carbs)}g</p>
                             </div>
                             <div className="bg-white dark:bg-bg-secondary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                 <p className="text-xs text-gray-500 dark:text-text-muted">🥑 Gorduras</p>
-                                <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{analysisResult.dailyMacros.fats}g</p>
+                                <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{formatValue(analysisResult.dailyMacros.fats)}g</p>
                             </div>
                         </div>
                     </div>
@@ -113,7 +146,7 @@ const NutritionPlan = () => {
                                         <UtensilsCrossed className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                                         <h4 className="font-bold text-gray-900 dark:text-text-primary">{meal.time} — {meal.name}</h4>
                                     </div>
-                                    <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400">{meal.calories} kcal</span>
+                                    <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400">{formatValue(meal.calories)} kcal</span>
                                 </div>
                                 {meal.ingredients && (
                                     <div className="flex flex-wrap gap-1.5 mt-2">
@@ -125,9 +158,9 @@ const NutritionPlan = () => {
                                     </div>
                                 )}
                                 <div className="flex space-x-4 mt-2 text-xs text-gray-500 dark:text-text-muted">
-                                    <span>P: {meal.protein}g</span>
-                                    <span>C: {meal.carbs}g</span>
-                                    <span>G: {meal.fats}g</span>
+                                    <span>P: {formatValue(meal.protein)}g</span>
+                                    <span>C: {formatValue(meal.carbs)}g</span>
+                                    <span>G: {formatValue(meal.fats)}g</span>
                                 </div>
                             </motion.div>
                         ))}

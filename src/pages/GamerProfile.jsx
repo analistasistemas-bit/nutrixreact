@@ -6,6 +6,7 @@ import { ACHIEVEMENTS, LEADERBOARD_DATA, PET_STAGES, getLevelTitle } from '../da
 import PetWidget from '../components/gamification/PetWidget';
 import XPBar from '../components/gamification/XPBar';
 import StreakCounter from '../components/gamification/StreakCounter';
+import { formatPtBrNumber } from '../lib/numberLocale';
 
 const GamerProfile = () => {
     const { level, totalXP, unlockedBadges, stats, currentStreak, petStage } = useGamification();
@@ -271,7 +272,7 @@ const GamerProfile = () => {
 
                                     {/* XP */}
                                     <div className="text-right">
-                                        <span className="text-sm font-bold text-gray-900 dark:text-zinc-100">{(entry.xp / 1000).toFixed(1)}k</span>
+                                        <span className="text-sm font-bold text-gray-900 dark:text-zinc-100">{formatPtBrNumber(entry.xp / 1000)}k</span>
                                         <p className="text-[10px] text-gray-400 dark:text-zinc-400">XP</p>
                                     </div>
                                 </motion.div>

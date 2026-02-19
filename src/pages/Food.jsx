@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line 
 import { Camera, Mic, Loader2, AlertTriangle, CheckCircle, RefreshCw, UtensilsCrossed, MicOff, Pencil, Trash2, Copy, CalendarDays, Eye } from 'lucide-react';
 import { useGamification } from '../hooks/useGamification';
 import { analyzeFoodPhoto, analyzeFoodDescription, getMealsByDateRange, updateMealEntry, deleteMealEntry, duplicateMealEntry, reanalyzeMealEntry } from '../services/aiService';
+import { formatPtBrNumber } from '../lib/numberLocale';
 
 const MEAL_TYPES = [
     { id: 'cafe-da-manha', label: 'Café da Manhã', emoji: '🌅' },
@@ -29,6 +30,7 @@ const toDateInput = (value) => {
 };
 
 const todayInputValue = () => toDateInput(new Date());
+const formatValue = (value) => formatPtBrNumber(value);
 
 const Food = () => {
     const [selectedMeal, setSelectedMeal] = useState(MEAL_TYPES[0]);
@@ -585,19 +587,19 @@ const Food = () => {
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                     <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                         <p className="text-xs text-gray-500 dark:text-text-muted">🔥 Calorias</p>
-                                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{analysisResult.totalCalories}</p>
+                                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatValue(analysisResult.totalCalories)}</p>
                                     </div>
                                     <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                         <p className="text-xs text-gray-500 dark:text-text-muted">🥩 Proteínas</p>
-                                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">{analysisResult.totalProtein}g</p>
+                                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatValue(analysisResult.totalProtein)}g</p>
                                     </div>
                                     <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                         <p className="text-xs text-gray-500 dark:text-text-muted">🍞 Carbos</p>
-                                        <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysisResult.totalCarbs}g</p>
+                                        <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatValue(analysisResult.totalCarbs)}g</p>
                                     </div>
                                     <div className="bg-white dark:bg-bg-primary rounded-xl p-3 text-center border border-gray-100 dark:border-border-subtle">
                                         <p className="text-xs text-gray-500 dark:text-text-muted">🥑 Gorduras</p>
-                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{analysisResult.totalFats}g</p>
+                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatValue(analysisResult.totalFats)}g</p>
                                     </div>
                                 </div>
                             </div>
@@ -619,8 +621,8 @@ const Food = () => {
                                                 <p className="text-gray-500 dark:text-text-muted text-xs">{food.portion}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">{food.calories} kcal</p>
-                                                <p className="text-gray-400 dark:text-text-disabled text-xs">P:{food.protein}g C:{food.carbs}g G:{food.fats}g</p>
+                                                <p className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">{formatValue(food.calories)} kcal</p>
+                                                <p className="text-gray-400 dark:text-text-disabled text-xs">P:{formatValue(food.protein)}g C:{formatValue(food.carbs)}g G:{formatValue(food.fats)}g</p>
                                             </div>
                                         </motion.div>
                                     ))}
@@ -723,10 +725,10 @@ const Food = () => {
                                                 {meal.description || meal.analysis?.description || 'Sem descrição'}
                                             </p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">{meal.calories || meal.analysis?.totalCalories || 0} kcal</p>
+                                    <div className="text-right">
+                                            <p className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">{formatValue(meal.calories || meal.analysis?.totalCalories || 0)} kcal</p>
                                             <p className="text-[11px] text-gray-500 dark:text-text-muted">
-                                                P:{meal.protein || meal.analysis?.totalProtein || 0}g C:{meal.carbs || meal.analysis?.totalCarbs || 0}g G:{meal.fats || meal.analysis?.totalFats || 0}g
+                                                P:{formatValue(meal.protein || meal.analysis?.totalProtein || 0)}g C:{formatValue(meal.carbs || meal.analysis?.totalCarbs || 0)}g G:{formatValue(meal.fats || meal.analysis?.totalFats || 0)}g
                                             </p>
                                         </div>
                                     </div>

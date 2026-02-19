@@ -42,7 +42,10 @@ export function parsePtBrNumber(value) {
     return Number.parseFloat(clean);
 }
 
-export function formatPtBrNumber(value, options = { maximumFractionDigits: 2 }) {
+export function formatPtBrNumber(
+    value,
+    options = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+) {
     const num = parsePtBrNumber(value);
     if (num === null || Number.isNaN(num)) return value;
     return new Intl.NumberFormat('pt-BR', options).format(num);

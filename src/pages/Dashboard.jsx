@@ -8,6 +8,7 @@ import StreakCounter from '../components/gamification/StreakCounter';
 import PetWidget from '../components/gamification/PetWidget';
 import DailyChallenges from '../components/gamification/DailyChallenges';
 import { getExamHistory, getTodayMeals, getLatestNutritionPlan, generateHealthInsights } from '../services/aiService';
+import { formatPtBrNumber } from '../lib/numberLocale';
 
 const INITIAL_MACROS = {
     protein: { consumed: 0, goal: 0, unit: 'g' },
@@ -49,7 +50,7 @@ const Dashboard = () => {
                     const mappedMetrics = biomarkers
                         .map(b => ({
                             name: b.name,
-                            value: `${b.value} ${b.unit}`,
+                            value: `${formatPtBrNumber(b.value)} ${b.unit}`,
                             status: b.status === 'low' ? 'Abaixo do normal' :
                                 b.status === 'high' ? 'Acima do normal' : 'Normal',
                             emoji: getClinicalCategoryEmoji(b.name),

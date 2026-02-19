@@ -36,6 +36,21 @@ npm install
 npm run dev
 ```
 
+### Backend Python (importação Docling)
+```bash
+cd backend-python
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.backend.example .env.backend
+uvicorn app.main:app --reload --port 8001
+```
+
+Com `VITE_IMPORT_USE_BACKEND=true`, os menus Exames/Medidas/Plano enviam PDF/imagem para o backend, que faz:
+1. extração com Docling -> markdown limpo
+2. extração estruturada com LLM
+3. persistência no Supabase (quando `SUPABASE_SERVICE_ROLE_KEY` estiver configurada)
+
 ---
 
 ## 🏗️ Exploração Técnica

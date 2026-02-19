@@ -36,6 +36,11 @@ export default defineConfig({
         target: 'https://integrate.api.nvidia.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/nv-api/, ''),
+      },
+      '/py-api': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/py-api/, ''),
       }
     }
   }
