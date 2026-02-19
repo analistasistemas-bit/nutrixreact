@@ -17,5 +17,8 @@ skills/
 backend-python/.venv/
 backend-python/temp/
 backend-python/.env.backend
+backend-python/**/.cache/
+backend-python/**/model/*.pth
+backend-python/**/model/*.bin
 __pycache__/
 *.pyc
