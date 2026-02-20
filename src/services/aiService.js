@@ -4,6 +4,7 @@
 import supabase from '../lib/supabase';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { GoogleGenAI } from '@google/genai';
 import { parsePtBrNumber, parsePtBrReferenceRange } from '../lib/numberLocale';
 
 // Usa worker local empacotado pelo Vite (evita CDN, 404 e bloqueio de CSP para fake worker/blob).
@@ -18,6 +19,27 @@ const IMPORT_OCR_MODEL =
 const NVIDIA_API_URL = '/nv-api/v1/chat/completions';
 const IMPORT_BACKEND_API_BASE = import.meta.env.VITE_IMPORT_BACKEND_URL || '/py-api';
 const IMPORT_USE_BACKEND = import.meta.env.VITE_IMPORT_USE_BACKEND !== 'false';
+const ENABLE_AI_LOGGING = import.meta.env.VITE_ENABLE_AI_LOGGING === 'true';
+
+// ============================================================
+// 📊 AI LOGGING HELPER
+// ============================================================
+export async function logAiUsage({ userEmail, functionName, modelUsed, promptTokens = 0, completionTokens = 0, totalTokens = 0 }) {
+    if (!ENABLE_AI_LOGGING) return; // Feature flag desabilitada no .env
+
+    try {
+        await supabase.from('nutrixo_ai_logs').insert([{
+            user_email: userEmail || 'unknown@system.local',
+            function_name: functionName,
+            model_used: modelUsed,
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+            total_tokens: totalTokens,
+        }]);
+    } catch (err) {
+        console.warn('⚠️ [logAiUsage] Falha ao registrar log de uso da IA:', err.message);
+    }
+}
 
 // ============================================================
 // 🛡️ SECURITY HELPERS
@@ -97,7 +119,7 @@ function getNvidiaApiKey() {
 /**
  * Chamada universal à NVIDIA API
  */
-async function createChatCompletion({ model = AI_MODEL, messages, stream = false }) {
+async function createChatCompletion({ model = AI_MODEL, messages, stream = false, originFunction = 'unknown', userEmail = null }) {
     const apiKey = getNvidiaApiKey();
 
     const body = {
@@ -130,7 +152,21 @@ async function createChatCompletion({ model = AI_MODEL, messages, stream = false
         return response; // Return raw response for streaming
     }
 
-    return await response.json();
+    const jsonResponse = await response.json();
+
+    // Dispara log assíncrono capturando as métricas
+    if (jsonResponse.usage) {
+        logAiUsage({
+            userEmail,
+            functionName: originFunction,
+            modelUsed: model,
+            promptTokens: jsonResponse.usage.prompt_tokens,
+            completionTokens: jsonResponse.usage.completion_tokens,
+            totalTokens: jsonResponse.usage.total_tokens
+        });
+    }
+
+    return jsonResponse;
 }
 
 async function* streamChatCompletion(response) {
@@ -630,6 +666,8 @@ REGRAS:
                 content: `Itens faltantes prioritários: ${missingLabels.join(', ')}\n\nTexto do PDF:\n${pdfText}`
             }
         ],
+        originFunction: 'extractMeasurementsFromPdfTextFocused',
+        userEmail: null
     });
 
     const responseText = completion.choices?.[0]?.message?.content || '';
@@ -982,6 +1020,8 @@ Retorne SOMENTE o JSON. Sem markdown, sem backticks.`
             const completion = await createChatCompletion({
                 model: IMPORT_OCR_MODEL,
                 messages: pageMessages,
+                originFunction: 'analyzeExam',
+                userEmail
             });
             const responseText = completion.choices[0].message.content;
             return parseAIJsonResponse(responseText);
@@ -1122,6 +1162,8 @@ REGRAS:
             const completion = await createChatCompletion({
                 model: IMPORT_OCR_MODEL,
                 messages: pageMessages,
+                originFunction: 'analyzeMeasurements',
+                userEmail
             });
 
             const responseText = completion.choices[0].message.content;
@@ -1250,6 +1292,8 @@ Retorne APENAS o JSON.`
             const completion = await createChatCompletion({
                 model: IMPORT_OCR_MODEL,
                 messages: pageMessages,
+                originFunction: 'analyzeNutritionPlan',
+                userEmail
             });
 
             const responseText = completion.choices[0].message.content;
@@ -1293,17 +1337,22 @@ export async function analyzeFoodPhoto(file, mealType) {
 
     // Convert file to base64 for vision
     const base64 = await fileToBase64(file);
+    // Remover o prefixo data:image/...;base64,
+    const base64Data = base64.split(',')[1];
+    const mimeType = file.type;
 
     // Upload photo to storage
     const uploadData = await uploadFileToStorage(file, 'meals');
     const fileUrl = getPublicUrl(uploadData.path);
 
-    const completion = await createChatCompletion({
-        model: AI_MODEL,
-        messages: [
-            {
-                role: 'system',
-                content: `Você é um nutricionista que analisa fotos de refeições. Identifique os alimentos na foto e estime os valores nutricionais. Retorne JSON:
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error('VITE_GEMINI_API_KEY não configurada no .env');
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const systemInstruction = `Você é um nutricionista que analisa fotos de refeições. Identifique os alimentos na foto e estime os valores nutricionais com base no seu conhecimento, mas sempre force o retorno final SOMENTE no formato JSON especificado. Não inclua Markdown como \`\`\`json ou texto extra na resposta, quero APENAS o JSON válido. Exemplo de retorno esperado:
 {
   "foods": [
     { "name": "Arroz branco", "portion": "150g", "calories": 195, "protein": 4, "carbs": 43, "fats": 0.4 }
@@ -1315,24 +1364,42 @@ export async function analyzeFoodPhoto(file, mealType) {
   "description": "Descrição curta da refeição",
   "healthScore": 7,
   "tips": "Dica nutritional breve"
-}
-Retorne APENAS o JSON.`
-            },
+}`;
+
+    const promptText = `Esta é uma foto do meu ${mealType}. Identifique os alimentos e estime as calorias.`;
+
+    const aiResponse = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+            promptText,
             {
-                role: 'user',
-                content: [
-                    { type: 'text', text: `Esta é uma foto do meu ${mealType}. Identifique os alimentos e estime as calorias:` },
-                    {
-                        type: 'image_url',
-                        image_url: { url: base64 },
-                    },
-                ],
-            },
+                inlineData: {
+                    data: base64Data,
+                    mimeType: mimeType,
+                }
+            }
         ],
+        config: {
+            systemInstruction: systemInstruction,
+            responseMimeType: 'application/json',
+            temperature: 0.2
+        }
     });
 
-    const responseText = completion.choices[0].message.content;
+    const responseText = aiResponse.text;
     const analysis = parseAIJsonResponse(responseText);
+
+    // Save memory tokens
+    if (aiResponse.usageMetadata) {
+        logAiUsage({
+            userEmail,
+            functionName: 'analyzeFoodPhoto',
+            modelUsed: 'gemini-2.5-flash',
+            promptTokens: aiResponse.usageMetadata.promptTokenCount,
+            completionTokens: aiResponse.usageMetadata.candidatesTokenCount,
+            totalTokens: aiResponse.usageMetadata.totalTokenCount
+        });
+    }
 
     // Save meal to DB
     const { data: meal } = await dbOperation(() => supabase
@@ -1495,6 +1562,8 @@ IMPORTANTE: Sempre lembre que você não substitui um profissional de saúde.`
             model: AI_MODEL,
             messages: [systemMessage, ...messages],
             stream: true,
+            originFunction: 'chatWithAssistant',
+            userEmail
         });
         return streamChatCompletion(response);
     } catch (error) {
@@ -1503,6 +1572,8 @@ IMPORTANTE: Sempre lembre que você não substitui um profissional de saúde.`
             model: AI_FALLBACK_MODEL,
             messages: [systemMessage, ...messages],
             stream: true,
+            originFunction: 'chatWithAssistant (Fallback)',
+            userEmail
         });
         return streamChatCompletion(fallbackResponse);
     }
@@ -1717,12 +1788,7 @@ export async function generateHealthInsights() {
         if (facts.length === 0) return [];
 
         // 3. Chamar IA para sintetizar insights APENAS dos fatos existentes
-        const completion = await createChatCompletion({
-            model: AI_MODEL,
-            messages: [
-                {
-                    role: 'system',
-                    content: `Você é um especialista em saúde e longevidade. Gere insights SOMENTE com base nos fatos fornecidos.
+        const promptReview = `Você é um especialista em saúde e longevidade. Gere insights SOMENTE com base nos fatos fornecidos.
                     JSON estruturado:
                     {
                       "insights": [
@@ -1739,13 +1805,24 @@ export async function generateHealthInsights() {
                     - Use EXATAMENTE 3 insights.
                     - Todo insight DEVE referenciar factId válido.
                     - NÃO invente qualquer métrica que não exista nos fatos.
-                    Retorne APENAS o JSON.`
+                    Retorne APENAS o JSON.`;
+
+        const userEmail = await getAuthenticatedEmail();
+
+        const completion = await createChatCompletion({
+            model: AI_MODEL,
+            messages: [
+                {
+                    role: 'system',
+                    content: promptReview
                 },
                 {
                     role: 'user',
                     content: `Fatos reais do usuário: ${JSON.stringify(facts)}`
                 }
-            ]
+            ],
+            originFunction: 'generateHealthInsights',
+            userEmail
         });
 
         const parsed = parseAIJsonResponse(completion.choices[0].message.content);

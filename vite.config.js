@@ -37,6 +37,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/nv-api/, ''),
       },
+      '/or-api': {
+        target: 'https://openrouter.ai/api/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/or-api/, ''),
+      },
       '/py-api': {
         target: 'http://localhost:8001',
         changeOrigin: true,

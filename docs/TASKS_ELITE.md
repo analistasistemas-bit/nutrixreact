@@ -31,14 +31,14 @@ Este arquivo serve como o controle de execução para as melhorias do NutixoApp.
 ---
 
 ## 🎨 [Épico 3] Refinamento UI/UX "Elite"
-- [ ] **Excelência Tipográfica**
-  - [ ] Importar fontes Fira Sans e Fira Code no `index.html`
-  - [ ] Atualizar variáveis de font-family no CSS global
-- [ ] **Feedback de Performance (IA)**
-  - [ ] Implementar Skeleton Screens no componente `AIAnalysisPage`
-- [ ] **Inclusão Digital (Acessibilidade)**
-  - [ ] Revisar navegação por teclado (foco visual)
-  - [ ] Adicionar `aria-labels` em ícones e ações críticas
+- [x] **Excelência Tipográfica**
+  - [x] Importar fontes Fira Sans e Fira Code no `index.html`
+  - [x] Atualizar variáveis de font-family no CSS global
+- [x] **Feedback de Performance (IA)**
+  - [x] Implementar Skeleton Screens no componente `AIAnalysisPage`
+- [x] **Inclusão Digital (Acessibilidade)**
+  - [x] Revisar navegação por teclado (foco visual)
+  - [x] Adicionar `aria-labels` em ícones e ações críticas
 
 ---
 

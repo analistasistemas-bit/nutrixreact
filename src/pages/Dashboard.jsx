@@ -185,7 +185,7 @@ const Dashboard = () => {
                                     placeholder="Buscar exame..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-2 bg-zinc-50 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
+                                    className="w-full pl-9 pr-3 py-2 bg-zinc-50 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-xl text-sm text-zinc-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
                                 />
                                 <TrendingUp className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
                             </div>
@@ -199,27 +199,27 @@ const Dashboard = () => {
                             </div>
                         ) : filteredHealthMetrics.length > 0 ? (
                             filteredHealthMetrics.map((metric, index) => (
-                                    <motion.div
-                                        key={index}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.05 }}
-                                        className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-zinc-200 dark:border-border-subtle hover:border-cyan-300 dark:hover:border-cyan-700 transition-all duration-300"
-                                    >
-                                        <div className="flex items-center space-x-3">
-                                            <span className="text-xl">{metric.emoji}</span>
-                                            <div>
-                                                <h3 className="font-bold text-base text-zinc-900 dark:text-text-primary">{metric.name}</h3>
-                                                <p className="text-zinc-500 dark:text-text-muted text-sm">{metric.value}</p>
-                                            </div>
+                                <motion.div
+                                    key={index}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.05 }}
+                                    className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-zinc-200 dark:border-border-subtle hover:border-cyan-300 dark:hover:border-cyan-700 transition-all duration-300"
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <span className="text-xl">{metric.emoji}</span>
+                                        <div>
+                                            <h3 className="font-bold text-base text-zinc-900 dark:text-text-primary">{metric.name}</h3>
+                                            <p className="text-zinc-500 dark:text-text-muted text-sm">{metric.value}</p>
                                         </div>
-                                        <div className={`px-3 py-1 rounded-lg text-xs font-bold ${metric.isAlert ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
-                                            'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
-                                            }`}>
-                                            {metric.status}
-                                        </div>
-                                    </motion.div>
-                                ))
+                                    </div>
+                                    <div className={`px-3 py-1 rounded-lg text-xs font-bold ${metric.isAlert ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
+                                        'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+                                        }`}>
+                                        {metric.status}
+                                    </div>
+                                </motion.div>
+                            ))
                         ) : (
                             <div className="text-center py-10 bg-zinc-50 dark:bg-bg-secondary rounded-xl border border-dashed border-zinc-200 dark:border-border-subtle">
                                 {healthMetrics.length > 0 && healthFilter === 'problems' ? (

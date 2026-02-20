@@ -25,9 +25,12 @@ import {
     Dna,
     X,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    HeartPulse,
+    AlertTriangle,
+    Lightbulb
 } from 'lucide-react';
-import { getExamHistory, getMeasurementHistory } from '../services/aiService';
+import { getExamHistory, getMeasurementHistory, generateHealthInsights } from '../services/aiService';
 import BiomarkerDetailDrawer from '../components/BiomarkerDetailDrawer';
 import { useGamification } from '../hooks/useGamification';
 import { formatPtBrNumber, parsePtBrNumber, parsePtBrReferenceRange } from '../lib/numberLocale';
@@ -109,46 +112,82 @@ const InsightDrawer = ({ isOpen, onClose }) => {
     );
 };
 
+// --- Sub-componente: InsightSkeleton (Carregamento Elegante) ---
+const InsightSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {[1, 2, 3].map((i) => (
+            <div key={i} className="p-6 rounded-[2.5rem] border border-zinc-800 bg-zinc-900/50 flex flex-col gap-4 animate-pulse">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-zinc-800 rounded-2xl" />
+                    <div className="h-2 w-24 bg-zinc-800 rounded" />
+                </div>
+                <div className="space-y-2">
+                    <div className="h-4 w-3/4 bg-zinc-800 rounded" />
+                    <div className="h-3 w-full bg-zinc-800/50 rounded" />
+                </div>
+            </div>
+        ))}
+    </div>
+);
+
 // --- Sub-componente: CorrelationInsights (Motor de Inteligência) ---
-const CorrelationInsights = ({ insights }) => {
+const CorrelationInsights = ({ insights, isLoading }) => {
+    if (isLoading) return <InsightSkeleton />;
     if (!insights || insights.length === 0) return null;
+
+    const getInsightConfig = (type) => {
+        switch (type) {
+            case 'positive':
+                return { icon: TrendingUp, theme: 'success', label: 'Evolução Detectada' };
+            case 'warning':
+                return { icon: AlertTriangle, theme: 'warning', label: 'Monitoramento Necessário' };
+            case 'tip':
+            default:
+                return { icon: Lightbulb, theme: 'info', label: 'Insight Estratégico' };
+        }
+    };
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {insights.map((insight, idx) => (
-                <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    whileHover={{
-                        y: -5,
-                        scale: 1.02,
-                        boxShadow: "0 20px 40px rgba(0,0,0,0.12)"
-                    }}
-                    transition={{
-                        delay: idx * 0.1,
-                        type: "spring",
-                        stiffness: 300
-                    }}
-                    className={`p-6 rounded-[2.5rem] border backdrop-blur-md shadow-lg flex flex-col justify-between group h-full cursor-default ${insight.theme === 'success'
-                        ? 'bg-cyan-50/40 dark:bg-cyan-500/5 border-cyan-100/50 dark:border-cyan-500/10'
-                        : 'bg-amber-50/40 dark:bg-amber-500/5 border-amber-100/50 dark:border-amber-500/10'
-                        }`}
-                >
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2.5 rounded-2xl ${insight.theme === 'success' ? 'bg-cyan-500/10' : 'bg-amber-500/10'}`}>
-                                <insight.icon className={`w-5 h-5 ${insight.theme === 'success' ? 'text-cyan-500' : 'text-amber-500'}`} />
+            {insights.map((insight, idx) => {
+                const config = getInsightConfig(insight.type);
+                const Icon = config.icon;
+
+                return (
+                    <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{
+                            y: -5,
+                            scale: 1.02,
+                            boxShadow: "0 20px 40px rgba(0,0,0,0.12)"
+                        }}
+                        transition={{
+                            delay: idx * 0.1,
+                            type: "spring",
+                            stiffness: 300
+                        }}
+                        className={`p-6 rounded-[2.5rem] border backdrop-blur-md shadow-lg flex flex-col justify-between group h-full cursor-default ${config.theme === 'success'
+                            ? 'bg-cyan-50/40 dark:bg-cyan-500/5 border-cyan-100/50 dark:border-cyan-500/10'
+                            : 'bg-amber-50/40 dark:bg-amber-500/5 border-amber-100/50 dark:border-amber-500/10'
+                            }`}
+                    >
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2.5 rounded-2xl ${config.theme === 'success' ? 'bg-cyan-500/10' : 'bg-amber-500/10'}`}>
+                                    <Icon className={`w-5 h-5 ${config.theme === 'success' ? 'text-cyan-500' : 'text-amber-500'}`} />
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">{config.label}</span>
                             </div>
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Insight Prioritário</span>
+                            <div>
+                                <h4 className="font-bold dark:text-white text-lg mb-2">{insight.title}</h4>
+                                <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">{insight.description}</p>
+                            </div>
                         </div>
-                        <div>
-                            <h4 className="font-bold dark:text-white text-lg mb-2">{insight.title}</h4>
-                            <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">{insight.description}</p>
-                        </div>
-                    </div>
-                </motion.div>
-            ))}
+                    </motion.div>
+                );
+            })}
         </div>
     );
 };
@@ -204,7 +243,7 @@ const AIScanCore = ({ status = 'normal' }) => {
 };
 
 // --- Sub-componente: AILogTerminal (Pensamentos da IA) ---
-const AILogTerminal = () => {
+const AILogTerminal = ({ isAiLoading }) => {
     const logs = [
         "Sincronizando últimos exames laboratoriais...",
         "Calculando correlação entre peso e massa muscular...",
@@ -219,11 +258,15 @@ const AILogTerminal = () => {
     const [currentLog, setCurrentLog] = useState(0);
 
     useEffect(() => {
+        if (!isAiLoading) {
+            setCurrentLog(logs.length - 1);
+            return;
+        }
         const interval = setInterval(() => {
-            setCurrentLog((prev) => (prev + 1) % logs.length);
-        }, 3000);
+            setCurrentLog((prev) => (prev + 1) % (logs.length - 1));
+        }, 2500);
         return () => clearInterval(interval);
-    }, [logs.length]);
+    }, [isAiLoading, logs.length]);
 
     return (
         <div className="h-6 flex items-center justify-center overflow-hidden">
@@ -690,6 +733,8 @@ const Progress = () => {
     const [exams, setExams] = useState([]);
     const [measurements, setMeasurements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [aiInsights, setAiInsights] = useState([]);
     const [selectedBiomarker, setSelectedBiomarker] = useState(null);
     const [selectedMarker, setSelectedMarker] = useState(null);
     const compRef = React.useRef(null);
@@ -751,22 +796,30 @@ const Progress = () => {
 
 
     useEffect(() => {
-        const loadAllData = async () => {
+        const loadInitialData = async () => {
             setIsLoading(true);
             try {
+                // Carregamento rápido (Dados do Banco)
                 const [examData, measureData] = await Promise.all([
                     getExamHistory(),
                     getMeasurementHistory()
                 ]);
                 setExams(examData);
                 setMeasurements(measureData);
+                setIsLoading(false); // Libera o render principal cedo
+
+                // Carregamento "Lento" (Insights da IA em Background)
+                setIsAiLoading(true);
+                const insightsData = await generateHealthInsights();
+                setAiInsights(insightsData);
             } catch (err) {
                 console.error('Erro ao carregar dados de progresso:', err);
-            } finally {
                 setIsLoading(false);
+            } finally {
+                setIsAiLoading(false);
             }
         };
-        loadAllData();
+        loadInitialData();
     }, []);
 
     const biomarkerProblemCount = React.useMemo(() => {
@@ -1072,7 +1125,7 @@ const Progress = () => {
             if (data && typeof data === 'object') {
                 Object.keys(data).forEach(key => {
                     // Filtrar chaves que não são medidas
-                    if (!['summary', 'recommendations', 'bmi', 'goal', 'previousInjuries', 'trainingDuration', 'trainingFrequency', 'sportsHistory', 'performanceIndicators'].includes(key)) {
+                    if (!['summary', 'recommendations', 'bmi', 'error', 'goal', 'previousInjuries', 'trainingDuration', 'trainingFrequency', 'sportsHistory', 'performanceIndicators'].includes(key)) {
                         uniqueMeasurementKeys.add(key);
                     }
                 });
@@ -1275,137 +1328,26 @@ const Progress = () => {
     }, [measurements, sortBy, searchTerm, getMeasurementTrend]);
 
     const detectedInsights = React.useMemo(() => {
-        if (!exams.length || !measurements.length) return [];
-
-        const insights = [];
-
-        // 1. Correlação: Peso vs Glicose
-        const wTrend = getMeasurementTrend('weight');
-        const gTrend = getBiomarkerTrend('Glicose');
-
-        if (wTrend.length >= 2 && gTrend.length >= 2) {
-            const wDiff = wTrend[wTrend.length - 1].value - wTrend[wTrend.length - 2].value;
-            const gDiff = parseNumberVal(gTrend[gTrend.length - 1].value) - parseNumberVal(gTrend[gTrend.length - 2].value);
-
-            if (wDiff < 0 && gDiff < 0) {
-                insights.push({
-                    title: 'Melhora Metabólica',
-                    description: 'A redução de peso está correlacionada com a queda na sua glicemia. Ótimo sinal de sensibilidade insulínica!',
-                    icon: Zap,
-                    theme: 'success'
-                });
-            }
+        if (!aiInsights || aiInsights.length === 0) {
+            return [
+                { title: 'Analisando Dados', description: 'Nossa IA está cruzando seus biomarcadores para identificar padrões.', type: 'tip', icon: Activity },
+                { title: 'Sincronização', description: 'Mantenha seus registros atualizados para insights mais precisos.', type: 'tip', icon: Zap },
+                { title: 'Evolução Clínica', description: 'Acompanhe seu progresso através dos gráficos detalhados.', type: 'tip', icon: HeartPulse }
+            ];
         }
 
-        // 2. Correlação: Recomposição (Gordura vs Massa Muscular)
-        const fTrend = getMeasurementTrend('bodyFat');
-        const mTrend = getMeasurementTrend('muscleMass');
+        const iconMap = {
+            positive: Zap,
+            warning: AlertCircle,
+            tip: BrainCircuit
+        };
 
-        if (fTrend.length >= 2 && mTrend.length >= 2) {
-            const fDiff = fTrend[fTrend.length - 1].value - fTrend[fTrend.length - 2].value;
-            const mDiff = mTrend[mTrend.length - 1].value - mTrend[mTrend.length - 2].value;
-
-            if (fDiff < 0 && mDiff > 0) {
-                insights.push({
-                    title: 'Recomposição Ativa',
-                    description: 'Você está perdendo gordura e ganhando massa muscular simultaneamente. Excelente qualidade de treino e dieta!',
-                    icon: Sparkles,
-                    theme: 'success'
-                });
-            }
-        }
-
-        // 3. Alerta: Colesterol total subindo
-        const cTrend = getBiomarkerTrend('Colesterol Total');
-        if (cTrend.length >= 2) {
-            const cDiff = parseNumberVal(cTrend[cTrend.length - 1].value) - parseNumberVal(cTrend[cTrend.length - 2].value);
-            if (cDiff > 10) {
-                insights.push({
-                    title: 'Atenção Lipídica',
-                    description: 'Houve um aumento recente no seu colesterol. Vale revisar a ingestão de gorduras saturadas.',
-                    icon: BrainCircuit,
-                    theme: 'warning'
-                });
-            }
-        }
-
-        // 4. Nova: Deficiência de Vitamina D
-        const vTrend = getBiomarkerTrend('Vitamina D');
-        if (vTrend.length > 0) {
-            const lastV = parseNumberVal(vTrend[vTrend.length - 1].value);
-            if (lastV < 30) {
-                insights.push({
-                    title: 'Vitamina D em Alerta',
-                    description: 'Seu nível atual está abaixo do ideal. Isso pode impactar sua imunidade e absorção de cálcio.',
-                    icon: AlertCircle,
-                    theme: 'warning',
-                    priority: 1
-                });
-            }
-        }
-
-        // 5. Nova: Estabilidade Glicêmica
-        const glucTrend = getBiomarkerTrend('Glicose');
-        if (glucTrend.length >= 3) {
-            const values = glucTrend.slice(-3).map(v => parseNumberVal(v.value));
-            const variance = Math.max(...values) - Math.min(...values);
-            if (variance < 5) {
-                insights.push({
-                    title: 'Controle Glicêmico Nota 10',
-                    description: 'Sua glicose tem se mantido extremamente estável nos últimos exames. Excelente sinal de saúde metabólica.',
-                    icon: CheckCircle2,
-                    theme: 'success',
-                    priority: 3
-                });
-            }
-        }
-
-        // 6. Nova: Hidratação Celular (Baseado em Água)
-        const waterTrend = getMeasurementTrend('water');
-        if (waterTrend.length > 0) {
-            const lastW = waterTrend[waterTrend.length - 1]?.value;
-            if (lastW > 50) { // Ex: acima de 50% de água
-                insights.push({
-                    title: 'Hidratação Otimizada',
-                    description: 'Sua composição de água corporal está excelente, favorecendo a recuperação muscular e transporte de nutrientes.',
-                    icon: Zap,
-                    theme: 'success',
-                    priority: 3
-                });
-            }
-        }
-
-        // --- Lógica de Fallback: Garantir pelo menos 3 cards ---
-        if (insights.length < 3) {
-            insights.push({
-                title: 'Monitoramento Contínuo',
-                description: 'A IA Nutrixo está processando seu histórico. Mantenha a frequência de registros para análises mais profundas.',
-                icon: Activity,
-                theme: 'success',
-                priority: 4
-            });
-        }
-
-        if (insights.length < 3) {
-            insights.push({
-                title: 'Consistência Nutricional',
-                description: 'Aguardando mais dados de exames para analisar tendências de biomarcadores.',
-                icon: CheckCircle2,
-                theme: 'success',
-                priority: 5
-            });
-        }
-
-        // Adiciona prioridade básica aos anteriores se não tiverem e força o tema 'success' para consistência visual
-        insights.forEach(insight => {
-            if (!insight.priority) insight.priority = insight.theme === 'warning' ? 1 : 2;
-            insight.theme = 'success'; // Padroniza para o visual Emerald solicitado
-        });
-
-        // Ordenar por prioridade (1 é maior prioridade) e limitar ou garantir os 3
-        const sorted = insights.sort((a, b) => a.priority - b.priority);
-        return sorted.slice(0, Math.max(3, sorted.length));
-    }, [exams, measurements, getBiomarkerTrend, getMeasurementTrend]);
+        return aiInsights.map(insight => ({
+            ...insight,
+            icon: iconMap[insight.type] || Activity,
+            theme: insight.type === 'positive' ? 'success' : insight.type === 'warning' ? 'warning' : 'success'
+        })).slice(0, 3);
+    }, [aiInsights]);
 
     if (isLoading) {
         return (
@@ -1521,7 +1463,7 @@ const Progress = () => {
 
                         <div className="space-y-12">
                             <div className="space-y-4">
-                                <AILogTerminal />
+                                <AILogTerminal isAiLoading={isAiLoading} />
                             </div>
 
                             {/* Main Analysis Card (Sentinela Briefing) */}
@@ -1744,7 +1686,7 @@ const Progress = () => {
                                                         date={latest.created_at}
                                                         history={history}
                                                         delay={0.4 + (0.1 * i)}
-                                                        onClick={() => setSelectedMarker({
+                                                        onClick={() => setSelectedBiomarker({
                                                             label: translateLabel(exam.name),
                                                             value: exam.value,
                                                             unit: exam.unit,
@@ -1766,7 +1708,10 @@ const Progress = () => {
                                     <h3 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Insights Estratégicos da Sentinela</h3>
                                     <div className="h-px flex-1 bg-zinc-100 dark:bg-white/5" />
                                 </div>
-                                <CorrelationInsights insights={detectedInsights} />
+                                <CorrelationInsights
+                                    insights={aiInsights}
+                                    isLoading={isAiLoading && aiInsights.length === 0}
+                                />
                             </div>
                         </div>
                     </motion.div>

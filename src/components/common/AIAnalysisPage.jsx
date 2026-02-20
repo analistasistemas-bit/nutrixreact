@@ -51,12 +51,13 @@ AIAnalysisPage.UploadZone = ({ onUpload, accept = ".pdf,.jpg,.jpeg,.png", label 
                 onChange={onUpload}
                 className="hidden"
                 id="ai-file-upload"
+                aria-label={label}
             />
             <label htmlFor="ai-file-upload" className="cursor-pointer">
-                <Upload className="w-14 h-14 text-gray-400 dark:text-text-muted mx-auto mb-3" />
+                <Upload className="w-14 h-14 text-gray-400 dark:text-text-muted mx-auto mb-3" aria-hidden="true" />
                 <div className="bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-700 dark:to-blue-700 text-white px-6 py-3 rounded-xl font-bold hover:from-cyan-500 hover:to-blue-500 transition-all duration-300 inline-flex items-center space-x-1.5 shadow-sm">
                     <span className="text-sm">{label}</span>
-                    <Sparkles className="w-3 h-3" />
+                    <Sparkles className="w-3 h-3" aria-hidden="true" />
                 </div>
                 <p className="text-gray-500 dark:text-text-muted text-xs mt-3">
                     PDF, JPG ou PNG • Análise por IA
@@ -112,7 +113,8 @@ AIAnalysisPage.Error = ({ error, onReset }) => (
                     {onReset && (
                         <button
                             onClick={onReset}
-                            className="flex items-center space-x-1 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-xs font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                            aria-label="Tentar análise novamente"
+                            className="flex items-center space-x-1 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-xs font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors focus-visible:ring-red-500"
                         >
                             <RefreshCw className="w-3 h-3" />
                             <span>Tentar novamente</span>
@@ -124,16 +126,33 @@ AIAnalysisPage.Error = ({ error, onReset }) => (
     </AnimatePresence>
 );
 
-// 5. Results Component
-AIAnalysisPage.Results = ({ show, children }) => (
+// 5. Skeleton Component
+AIAnalysisPage.Skeleton = () => (
+    <div className="space-y-4 animate-pulse">
+        <div className="h-4 bg-gray-200 dark:bg-bg-tertiary rounded w-3/4"></div>
+        <div className="grid grid-cols-2 gap-4">
+            <div className="h-20 bg-gray-100 dark:bg-bg-tertiary/50 rounded-xl"></div>
+            <div className="h-20 bg-gray-100 dark:bg-bg-tertiary/50 rounded-xl"></div>
+        </div>
+        <div className="h-4 bg-gray-200 dark:bg-bg-tertiary rounded w-1/2"></div>
+        <div className="space-y-2">
+            <div className="h-3 bg-gray-100 dark:bg-bg-tertiary/30 rounded w-full"></div>
+            <div className="h-3 bg-gray-100 dark:bg-bg-tertiary/30 rounded w-full"></div>
+            <div className="h-3 bg-gray-100 dark:bg-bg-tertiary/30 rounded w-5/6"></div>
+        </div>
+    </div>
+);
+
+// 6. Results Component
+AIAnalysisPage.Results = ({ show, isAnalyzing, children }) => (
     <AnimatePresence>
-        {show && (
+        {(show || isAnalyzing) && (
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-4 my-4"
             >
-                {children}
+                {isAnalyzing ? <AIAnalysisPage.Skeleton /> : children}
             </motion.div>
         )}
     </AnimatePresence>
@@ -169,6 +188,7 @@ export const AIAnalysisUploadZone = AIAnalysisPage.UploadZone;
 export const AIAnalysisLoading = AIAnalysisPage.Loading;
 export const AIAnalysisError = AIAnalysisPage.Error;
 export const AIAnalysisResults = AIAnalysisPage.Results;
+export const AIAnalysisSkeleton = AIAnalysisPage.Skeleton;
 export const AIAnalysisDisclaimer = AIAnalysisPage.Disclaimer;
 
 export default AIAnalysisPage;
