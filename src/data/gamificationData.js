@@ -39,6 +39,7 @@ export const XP_REWARDS = {
     LOG_MEAL: { xp: 15, label: 'Refeição registrada' },
     UPLOAD_EXAM: { xp: 50, label: 'Exame enviado' },
     UPLOAD_PLAN: { xp: 40, label: 'Plano alimentar enviado' },
+    AI_PLAN_GENERATED: { xp: 40, label: 'Plano feito por IA' },
     COMPLETE_CHALLENGE: { xp: 30, label: 'Desafio completo' },
     DAILY_STREAK: { xp: 10, label: 'Streak diário' }, // multiplied by streak count
     UNLOCK_ACHIEVEMENT: { xp: 100, label: 'Conquista desbloqueada' },

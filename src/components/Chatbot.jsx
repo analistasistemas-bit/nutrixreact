@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { Bot, X, Loader2 } from 'lucide-react';
-import { chatWithAssistant, getExamHistory, getTodayMeals } from '../services/aiService';
+import { chatWithAssistant, getExamHistory, getTodayMeals, getLatestMeasurements } from '../services/aiService';
 
 const SendIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -44,9 +44,10 @@ const Chatbot = () => {
         // Get user context
         let userContext = {};
         try {
-            const [exams, meals] = await Promise.all([
+            const [exams, meals, measurements] = await Promise.all([
                 getExamHistory().catch(() => []),
                 getTodayMeals().catch(() => []),
+                getLatestMeasurements().catch(() => null),
             ]);
             if (exams.length > 0) {
                 userContext.lastExam = exams[0]?.analysis;
@@ -57,6 +58,9 @@ const Chatbot = () => {
                     calories: m.calories,
                     description: m.description,
                 }));
+            }
+            if (measurements?.analysis) {
+                userContext.measurements = measurements.analysis;
             }
         } catch {
             // Continue without context
@@ -99,7 +103,7 @@ const Chatbot = () => {
     };
 
     return (
-        <div className="fixed bottom-24 right-4 z-50 lg:bottom-4 lg:right-4">
+        <div className="fixed right-4 z-[60] bottom-[calc(env(safe-area-inset-bottom,0px)+88px)] lg:bottom-4">
             <AnimatePresence>
                 {!showChatbot ? (
                     <div className="relative"> {/* Wrapper relativo para conter o pulso absoluto */}

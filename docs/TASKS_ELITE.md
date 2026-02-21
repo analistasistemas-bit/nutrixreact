@@ -1,74 +1,99 @@
 # Checklist de Implementação: Fase Elite 🛠️
 
-Este arquivo serve como o controle de execução para as melhorias do NutixoApp. Marque os itens conforme avançarmos.
+Este arquivo serve como controle de execução para as melhorias do NutixoApp.
 
 ---
 
-## 📦 [Épico 1] PWA & Portabilidade [CONCLUÍDO] ✅
-- [x] **Instalação do Core PWA**
-  - [x] Rodar `npm install -D vite-plugin-pwa`
-  - [x] Configurar `vite.config.js` with the plugin PWA
-- [x] **Identidade do App (Manifest)**
-  - [x] Gerar ícones 192x192 e 512x512 com a logo Nutixo
-  - [x] Criar/Configurar arquivo `manifest.webmanifest`
-- [x] **Resiliência e Cache**
-  - [x] Configurar estratégia de cache Service Worker (Stale-While-Revalidate)
-  - [x] Adicionar aviso de "Nova versão disponível" (Prompt de atualização)
+## 📦 [Épico 1] PWA & Portabilidade ✅ CONCLUÍDO
+
+- [x] Instalar e configurar `vite-plugin-pwa`
+- [x] Gerar ícones 192x192 e 512x512 com a logo Nutixo
+- [x] Criar/Configurar `manifest.webmanifest`
+- [x] Configurar estratégia de cache Service Worker (Stale-While-Revalidate)
+- [x] Adicionar aviso de "Nova versão disponível" (`ReloadPrompt.jsx`)
+- [x] Aplicar `safe-area-inset` para dispositivos com notch/home bar
 
 ---
 
-## 🏗️ [Épico 2] Infraestrutura & Dados Reais (Integrado) [CONCLUÍDO] ✅
-- [x] **Setup do Insforge DB**
-  - [x] Criar tabela `profiles` com colunas `xp`, `level` e `avatar_id`
-  - [x] Criar tabela `health_history` para armazenar resultados de exames
-- [x] **Camada de Sincronização (Sync Layer)**
-  - [x] Implementar Hook `useSync` no `GamificationContext`
-  - [x] Criar lógica para persistir dados locais -> banco quando online
-- [x] **Segurança de Dados** ✅
-  - [x] Implementar fluxo de login real com o SDK do Insforge
-  - [x] Adicionar validação JWT nas chamadas de dados de saúde
+## 🏗️ [Épico 2] Infraestrutura & Dados Reais ✅ CONCLUÍDO
+
+- [x] Criar tabelas Supabase (`nutrixo_profiles`, `nutrixo_exams`, `nutrixo_meals`, etc.)
+- [x] Implementar RLS (Row Level Security) em todas as tabelas
+- [x] Implementar fluxo de Login real com Supabase Auth (JWT)
+- [x] Sincronização de XP com `nutrixo_profiles` no banco
+- [x] Backend Python com FastAPI + Docling para processamento de PDF
+- [x] Jobs assíncronos com polling de status (`/api/import/{kind}/{job_id}`)
+- [x] Integração com Supabase Storage para armazenamento de arquivos
+- [x] Histórico persistente de refeições (`nutrixo_meals`) com CRUD completo
 
 ---
 
-## 🎨 [Épico 3] Refinamento UI/UX "Elite"
-- [x] **Excelência Tipográfica**
-  - [x] Importar fontes Fira Sans e Fira Code no `index.html`
-  - [x] Atualizar variáveis de font-family no CSS global
-- [x] **Feedback de Performance (IA)**
-  - [x] Implementar Skeleton Screens no componente `AIAnalysisPage`
-- [x] **Inclusão Digital (Acessibilidade)**
-  - [x] Revisar navegação por teclado (foco visual)
-  - [x] Adicionar `aria-labels` em ícones e ações críticas
+## 🎨 [Épico 3] Refinamento UI/UX ✅ CONCLUÍDO
+
+- [x] Fontes Fira Sans e Fira Code no `index.html`
+- [x] Skeleton screens no componente `AIAnalysisPage`
+- [x] `aria-labels` em ícones e ações críticas
+- [x] Constantes de animação centralizadas em `src/lib/animations.js`
+- [x] Tokens CSS para light mode e dark mode em `src/index.css`
+- [x] Hierarquia de z-index como variáveis CSS
+- [x] Componentes comuns: `LoadingSpinner`, `EmptyState`, `Badge`, `SectionHeader`
+- [x] Dark mode unificado em `AccountProfile`, `AccountSettings`, `GamerProfile`
+- [x] FAB do Chatbot corrigido no mobile (safe-area-inset-bottom)
+- [x] Animações Framer Motion em `AccountProfile` e `AccountSettings`
+- [x] DESIGN_SYSTEM.md reescrito com todos os padrões atuais
 
 ---
 
-## 🚀 [Épico 4] Diferenciais Sentinel
-- [ ] **Integrações Push**
-  - [ ] Pedir permissão ao usuário para notificações
-  - [ ] Enviar notificação de boas-vindas/tutorial
+## 🚀 [Épico 4] Diferenciais Sentinel — EM PROGRESSO
+
+- [ ] **Push Notifications**
+  - [ ] Solicitar permissão ao usuário
+  - [ ] Enviar notificação de lembrete de registro de refeição
+  - [ ] Notificação quando exame é processado
 - [ ] **Modo OLED**
-  - [ ] Implementar toggle visual para tema "Total Black" (#000000)
+  - [ ] Adicionar toggle para tema "Total Black" (#000000)
+  - [ ] Definir variável `bg-oled` no design system
 
 ---
 
-## 🍽️ [Épico 5] Diário Persistente (Histórico de Refeições)
-- [ ] **Opção 1 (Atual) - Implementação incremental no `Food.jsx` + `aiService`**
-  - [x] Persistir refeições no banco e recarregar histórico no Diário
-  - [x] Adicionar histórico com filtro de data (Hoje, 7 dias, 30 dias, customizado)
-  - [x] Criar fluxo híbrido: lista com ações rápidas + detalhe ao clicar
-  - [x] Implementar editar refeição (manual) com salvamento
-  - [x] Implementar reanálise IA sobrescrevendo refeição atual
-  - [x] Implementar excluir refeição com confirmação simples
-  - [x] Implementar duplicar refeição no histórico
-  - [ ] Refinar UX (estados vazios, mensagens, feedback de sucesso por ação)
-  - [ ] Cobrir edge-cases (token expirado durante edição/duplicação/exclusão)
-- [ ] **Opção 2 (Evolução) - Refatoração em componentes dedicados**
-  - [ ] Extrair `MealHistoryFilters` (filtros rápidos + período customizado)
-  - [ ] Extrair `MealHistoryList` (cards e ações rápidas)
-  - [ ] Extrair `MealEditorModal` (edição, reanálise, exclusão)
-  - [ ] Padronizar serviços em `mealService` separado de `aiService`
-  - [ ] Adicionar testes de fluxo (histórico, edição, exclusão, duplicação)
-  - [ ] Melhorar performance com paginação/lazy load no histórico
+## 🍽️ [Épico 5] Diário Persistente (Histórico de Refeições) ✅ QUASE COMPLETO
+
+- [x] Persistir refeições no banco e recarregar histórico
+- [x] Filtro de data (Hoje, 7 dias, 30 dias, customizado)
+- [x] Barra de macros diária com progresso vs meta (adicionado v1.2.0)
+- [x] Fluxo híbrido: lista com ações rápidas + detalhe ao clicar
+- [x] Editar refeição (manual)
+- [x] Reanálise IA sobrescrevendo refeição atual
+- [x] Excluir refeição com confirmação
+- [x] Duplicar refeição
+- [ ] Refinar UX — estados vazios e feedback por ação
+- [ ] Cobrir edge-cases (token expirado durante edição/duplicação)
+- [ ] Extrair `MealHistoryList`, `MealEditorModal` em componentes dedicados
 
 ---
-*Próxima Tarefa Sugerida: Iniciar Épico 1 (Instalação do Vite PWA).*
+
+## 📈 [Épico 6] Progress Hub — ✅ CONCLUÍDO (v1.2.0)
+
+- [x] Seletor de período visual (7D / 30D / 3M / 1A) com filtragem real
+- [x] Filtragem de biomarcadores e medidas por período selecionado
+- [x] Timeline de exames por data em Labs
+- [x] Badge "Novo" para exames recentes (< 7 dias)
+- [x] Delta (▲▼) entre último e penúltimo resultado de cada biomarcador
+
+---
+
+## 📋 Próximas Tarefas Sugeridas
+
+1. **Épico 4**: Implementar Push Notifications (Modo OLED é mais simples — pode começar por ele)
+2. **Épico 5**: Extrair componentes dedicados do Food (MealHistoryList, MealEditorModal)
+3. **Épico 7 (novo)**: Módulo de Treinos — registro, histórico, integração com Progress
+
+---
+
+### Legenda
+- ✅ Concluído
+- 🏗️ Em progresso
+- [ ] Pendente
+- ⏸️ Pausado
+
+*Atualizado em: 20 de Fevereiro de 2026*

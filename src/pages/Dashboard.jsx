@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
-import { TrendingUp, ChevronDown, Upload, Camera, MessageCircle, FileText, Shield, Lock, Sparkles, HeartPulse, Info, AlertTriangle } from 'lucide-react';
+import { TrendingUp, ChevronDown, Upload, Camera, MessageCircle, FileText, Shield, Lock, Sparkles, HeartPulse, Info, AlertTriangle, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import MacroNutrientsCard from '../components/MacroNutrientsCard';
 import XPBar from '../components/gamification/XPBar';
 import StreakCounter from '../components/gamification/StreakCounter';
@@ -125,6 +125,25 @@ const Dashboard = () => {
         fetchHealthData();
         fetchNutritionData();
         fetchInsights();
+
+        let lastRefreshAt = Date.now();
+        const refreshInsightsOnFocus = () => {
+            if (document.visibilityState !== 'visible') return;
+            const now = Date.now();
+            // evita spam de chamadas em trocas rápidas de foco
+            if (now - lastRefreshAt < 15000) return;
+            lastRefreshAt = now;
+            setIsLoadingInsights(true);
+            fetchInsights();
+        };
+
+        window.addEventListener('focus', refreshInsightsOnFocus);
+        document.addEventListener('visibilitychange', refreshInsightsOnFocus);
+
+        return () => {
+            window.removeEventListener('focus', refreshInsightsOnFocus);
+            document.removeEventListener('visibilitychange', refreshInsightsOnFocus);
+        };
     }, []);
 
     const filteredHealthMetrics = healthMetrics
@@ -149,6 +168,54 @@ const Dashboard = () => {
             <div className="xl:col-span-2 space-y-6">
                 {/* XP Bar */}
                 <XPBar />
+
+                {/* Resumo do Dia */}
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="bg-white dark:bg-bg-elevated rounded-2xl border border-zinc-200 dark:border-border-subtle p-4 shadow-sm"
+                >
+                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-text-muted mb-3">Resumo do Dia</p>
+                    <div className="grid grid-cols-3 gap-3">
+                        {[
+                            {
+                                label: 'Exames',
+                                icon: healthMetrics.length > 0 ? CheckCircle2 : Clock,
+                                color: healthMetrics.length > 0 ? 'text-green-500' : 'text-zinc-400 dark:text-text-muted',
+                                bg: healthMetrics.length > 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-zinc-50 dark:bg-bg-secondary',
+                                status: healthMetrics.length > 0 ? `${healthMetrics.length} marcadores` : 'Nenhum ainda',
+                                onClick: () => navigate('/labs'),
+                            },
+                            {
+                                label: 'Dieta',
+                                icon: consumedCalories > 0 ? CheckCircle2 : XCircle,
+                                color: consumedCalories > 0 ? 'text-cyan-500' : 'text-zinc-400 dark:text-text-muted',
+                                bg: consumedCalories > 0 ? 'bg-cyan-50 dark:bg-cyan-900/20' : 'bg-zinc-50 dark:bg-bg-secondary',
+                                status: consumedCalories > 0 ? `${consumedCalories} kcal` : 'Não registrado',
+                                onClick: () => navigate('/food'),
+                            },
+                            {
+                                label: 'Alertas',
+                                icon: problemCount > 0 ? AlertTriangle : CheckCircle2,
+                                color: problemCount > 0 ? 'text-amber-500' : 'text-green-500',
+                                bg: problemCount > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-green-50 dark:bg-green-900/20',
+                                status: problemCount > 0 ? `${problemCount} marcador${problemCount > 1 ? 'es' : ''}` : 'Tudo normal',
+                                onClick: () => { setHealthFilter('problems'); },
+                            },
+                        ].map(({ label, icon: Icon, color, bg, status, onClick }) => (
+                            <button
+                                key={label}
+                                onClick={onClick}
+                                className={`flex flex-col items-center gap-2 p-3 rounded-xl border border-zinc-100 dark:border-border-subtle ${bg} hover:opacity-80 transition-opacity text-center`}
+                            >
+                                <Icon className={`w-5 h-5 ${color}`} />
+                                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-text-muted">{label}</span>
+                                <span className="text-xs font-bold text-zinc-800 dark:text-text-primary leading-tight">{status}</span>
+                            </button>
+                        ))}
+                    </div>
+                </motion.div>
 
                 {/* Health Overview */}
                 <motion.div
@@ -371,8 +438,8 @@ const Dashboard = () => {
                                 <Camera className="w-4 h-4 text-white" />
                             </div>
                             <div className="text-left">
-                                <span className="font-bold block text-gray-900 dark:text-slate-100 text-sm">📸 Foto da Refeição</span>
-                                <span className="text-gray-600 dark:text-slate-400 text-xs">+15 XP • Estimativa automática</span>
+                                <span className="font-bold block text-gray-900 dark:text-text-primary text-sm">📸 Foto da Refeição</span>
+                                <span className="text-gray-600 dark:text-text-muted text-xs">+15 XP • Estimativa automática</span>
                             </div>
                         </motion.button>
 
@@ -385,8 +452,8 @@ const Dashboard = () => {
                                 <MessageCircle className="w-4 h-4 text-white" />
                             </div>
                             <div className="text-left">
-                                <span className="font-bold block text-gray-900 dark:text-slate-100 text-sm">🤖 Chat com IA</span>
-                                <span className="text-gray-600 dark:text-slate-400 text-xs">Assistente de saúde 24/7</span>
+                                <span className="font-bold block text-gray-900 dark:text-text-primary text-sm">🤖 Chat com IA</span>
+                                <span className="text-gray-600 dark:text-text-muted text-xs">Assistente de saúde 24/7</span>
                             </div>
                         </motion.button>
 
@@ -400,8 +467,8 @@ const Dashboard = () => {
                                 <FileText className="w-4 h-4 text-white" />
                             </div>
                             <div className="text-left">
-                                <span className="font-bold block text-gray-900 dark:text-slate-100 text-sm">📋 Upload Plano Alimentar</span>
-                                <span className="text-gray-600 dark:text-slate-400 text-xs">+40 XP • Importe seu plano</span>
+                                <span className="font-bold block text-gray-900 dark:text-text-primary text-sm">📋 Upload Plano Alimentar</span>
+                                <span className="text-gray-600 dark:text-text-muted text-xs">+40 XP • Importe seu plano</span>
                             </div>
                         </motion.button>
                     </div>

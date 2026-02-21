@@ -143,7 +143,7 @@ export const GamificationProvider = ({ children }) => {
             const newStats = { ...prev, level: newLevel };
             if (rewardKey === 'LOG_MEAL') newStats.mealsLogged = (prev.mealsLogged || 0) + 1;
             if (rewardKey === 'UPLOAD_EXAM') newStats.examsUploaded = (prev.examsUploaded || 0) + 1;
-            if (rewardKey === 'UPLOAD_PLAN') newStats.plansUploaded = (prev.plansUploaded || 0) + 1;
+            if (rewardKey === 'UPLOAD_PLAN' || rewardKey === 'AI_PLAN_GENERATED') newStats.plansUploaded = (prev.plansUploaded || 0) + 1;
             if (rewardKey === 'COMPLETE_CHALLENGE') newStats.challengesCompleted = (prev.challengesCompleted || 0) + 1;
 
             // Check for new achievements inline to ensure they use latest stats

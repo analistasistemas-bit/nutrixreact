@@ -32,6 +32,15 @@ const toDateInput = (value) => {
 const todayInputValue = () => toDateInput(new Date());
 const formatValue = (value) => formatPtBrNumber(value);
 
+const DAILY_GOALS = { calories: 2000, protein: 150, carbs: 250, fats: 65 };
+
+const MACRO_COLORS = {
+    cyan:  { bar: 'bg-cyan-500',  text: 'text-cyan-600 dark:text-cyan-400'  },
+    blue:  { bar: 'bg-blue-500',  text: 'text-blue-600 dark:text-blue-400'  },
+    amber: { bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
+    rose:  { bar: 'bg-rose-500',  text: 'text-rose-600 dark:text-rose-400'  },
+};
+
 const Food = () => {
     const [selectedMeal, setSelectedMeal] = useState(MEAL_TYPES[0]);
     const [activeMode, setActiveMode] = useState(null);
@@ -334,6 +343,18 @@ const Food = () => {
         setEstimationNotice('');
     };
 
+    const todayTotals = React.useMemo(() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayMeals = historyMeals.filter(m => (m.created_at || '').startsWith(todayStr));
+        return {
+            calories: todayMeals.reduce((s, m) => s + (Number(m.calories) || 0), 0),
+            protein:  todayMeals.reduce((s, m) => s + (Number(m.protein)  || 0), 0),
+            carbs:    todayMeals.reduce((s, m) => s + (Number(m.carbs)    || 0), 0),
+            fats:     todayMeals.reduce((s, m) => s + (Number(m.fats)     || 0), 0),
+            count:    todayMeals.length,
+        };
+    }, [historyMeals]);
+
     // ========== RESET ==========
     const reset = () => {
         setActiveMode(null);
@@ -363,6 +384,57 @@ const Food = () => {
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">🍽️ Registrar Alimentação</h2>
                     <p className="text-gray-600 dark:text-text-secondary text-sm">Tire uma foto, use a voz ou descreva o que comeu</p>
                 </div>
+
+                {/* Daily Macros Bar */}
+                {!historyLoading && (
+                    <div className="mb-6 p-4 bg-zinc-50 dark:bg-bg-secondary rounded-2xl border border-zinc-200 dark:border-border-subtle">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-[10px] font-black text-zinc-500 dark:text-text-muted uppercase tracking-widest">
+                                Macros de Hoje
+                            </h3>
+                            <span className="text-[10px] text-zinc-400 dark:text-text-muted">
+                                {todayTotals.count === 0
+                                    ? 'Nenhuma refeição registrada'
+                                    : `${todayTotals.count} refeição${todayTotals.count !== 1 ? 'ões' : ''}`}
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            {[
+                                { label: 'Kcal',        value: todayTotals.calories, goal: DAILY_GOALS.calories, unit: '',  color: 'cyan'  },
+                                { label: 'Proteína',    value: todayTotals.protein,  goal: DAILY_GOALS.protein,  unit: 'g', color: 'blue'  },
+                                { label: 'Carboidratos',value: todayTotals.carbs,    goal: DAILY_GOALS.carbs,    unit: 'g', color: 'amber' },
+                                { label: 'Gorduras',    value: todayTotals.fats,     goal: DAILY_GOALS.fats,     unit: 'g', color: 'rose'  },
+                            ].map(({ label, value, goal, unit, color }) => {
+                                const pct = Math.min((value / goal) * 100, 100);
+                                const isOver = value > goal;
+                                const colors = MACRO_COLORS[color];
+                                return (
+                                    <div key={label} className="space-y-1.5">
+                                        <div className="flex items-baseline justify-between gap-1">
+                                            <span className="text-[10px] font-bold text-zinc-500 dark:text-text-muted uppercase tracking-wide truncate">{label}</span>
+                                            <span className={`text-xs font-bold tabular-nums flex-shrink-0 ${isOver ? 'text-rose-500' : 'text-zinc-800 dark:text-text-primary'}`}>
+                                                {formatValue(value)}{unit}
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 bg-zinc-200 dark:bg-bg-tertiary rounded-full overflow-hidden">
+                                            <motion.div
+                                                className={`h-full rounded-full ${isOver ? 'bg-rose-400' : colors.bar}`}
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${pct}%` }}
+                                                transition={{ duration: 0.6, ease: 'easeOut' }}
+                                            />
+                                        </div>
+                                        <p className={`text-[10px] ${colors.text}`}>
+                                            {isOver
+                                                ? `+${formatValue(value - goal)}${unit} acima da meta`
+                                                : `Meta: ${goal}${unit}`}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Meal Type Selector */}
                 <div className="flex flex-wrap gap-2 mb-6 justify-center">

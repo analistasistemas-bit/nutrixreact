@@ -371,6 +371,118 @@ function parseAIJsonResponse(responseText) {
     }
 }
 
+function normalizePlanMealEntry(meal) {
+    if (!meal || typeof meal !== 'object') return null;
+    return {
+        time: meal.time || 'Refeição',
+        name: meal.name || 'Opção Sugerida',
+        calories: Number(meal.calories || 0),
+        protein: Number(meal.protein || 0),
+        carbs: Number(meal.carbs || 0),
+        fats: Number(meal.fats || 0),
+        ingredients: Array.isArray(meal.ingredients)
+            ? meal.ingredients.map((item) => String(item))
+            : (typeof meal.ingredients === 'string' ? [meal.ingredients] : [])
+    };
+}
+
+function dedupePlanMeals(meals = []) {
+    const seen = new Set();
+    const deduped = [];
+
+    meals.forEach((meal) => {
+        const normalized = normalizePlanMealEntry(meal);
+        if (!normalized) return;
+        const key = normalizeBiomarkerToken(`${normalized.time}|${normalized.name}`);
+        if (seen.has(key)) return;
+        seen.add(key);
+        deduped.push(normalized);
+    });
+
+    return deduped;
+}
+
+function buildFallbackMeals({ targetMeals, dailyMacros, existingMeals = [] }) {
+    const slotsByCount = {
+        3: ['Café da Manhã', 'Almoço', 'Jantar'],
+        4: ['Café da Manhã', 'Almoço', 'Lanche da Tarde', 'Jantar'],
+        5: ['Café da Manhã', 'Lanche da Manhã', 'Almoço', 'Lanche da Tarde', 'Jantar'],
+        6: ['Café da Manhã', 'Lanche da Manhã', 'Almoço', 'Lanche da Tarde', 'Jantar', 'Ceia']
+    };
+    const slots = slotsByCount[targetMeals] || slotsByCount[4];
+    const used = new Set(existingMeals.map((meal) => normalizeBiomarkerToken(meal?.time)));
+
+    const caloriesPerMeal = Math.round(Number(dailyMacros?.calories || 0) / targetMeals) || 0;
+    const proteinPerMeal = Math.round((Number(dailyMacros?.protein || 0) / targetMeals) * 10) / 10;
+    const carbsPerMeal = Math.round((Number(dailyMacros?.carbs || 0) / targetMeals) * 10) / 10;
+    const fatsPerMeal = Math.round((Number(dailyMacros?.fats || 0) / targetMeals) * 10) / 10;
+
+    return slots
+        .filter((slot) => !used.has(normalizeBiomarkerToken(slot)))
+        .map((slot) => ({
+            time: slot,
+            name: `Sugestão para ${slot.toLowerCase()}`,
+            calories: caloriesPerMeal,
+            protein: proteinPerMeal,
+            carbs: carbsPerMeal,
+            fats: fatsPerMeal,
+            ingredients: ['Item sugerido pela IA']
+        }));
+}
+
+async function completeMissingMealsWithAI({ wizardData, currentAnalysis, targetMeals, userEmail }) {
+    const currentMeals = Array.isArray(currentAnalysis?.meals) ? currentAnalysis.meals : [];
+    const missingCount = Math.max(0, targetMeals - currentMeals.length);
+    if (missingCount === 0) return [];
+
+    const completion = await createChatCompletion({
+        model: AI_MODEL,
+        messages: [
+            {
+                role: 'system',
+                content: `Você é um nutricionista clínico.
+Complete SOMENTE as refeições faltantes para um plano alimentar já iniciado.
+Retorne APENAS JSON válido no formato:
+{
+  "meals": [
+    {
+      "time": "Almoço",
+      "name": "Opção de almoço",
+      "calories": 500,
+      "protein": 35,
+      "carbs": 55,
+      "fats": 16,
+      "ingredients": ["Item 1", "Item 2"]
+    }
+  ]
+}
+REGRAS:
+- Retorne exatamente ${missingCount} refeições.
+- Não repetir refeições já existentes.
+- Distribua calorias/macros de forma coerente com os macros diários.
+- Sem markdown, sem texto extra.`
+            },
+            {
+                role: 'user',
+                content: JSON.stringify({
+                    patient: wizardData,
+                    targetMeals,
+                    existingMeals: currentMeals,
+                    dailyMacros: currentAnalysis?.dailyMacros || null
+                })
+            }
+        ],
+        stream: false,
+        originFunction: 'completeMissingMealsWithAI',
+        userEmail
+    });
+
+    const text = completion.choices?.[0]?.message?.content || '';
+    const parsed = parseAIJsonResponse(text);
+    const extracted = Array.isArray(parsed?.meals) ? parsed.meals : [];
+    return dedupePlanMeals(extracted).slice(0, missingCount);
+}
+
 function normalizeExamName(name = '') {
     return String(name).trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -1329,6 +1441,209 @@ Retorne APENAS o JSON.`
 }
 
 // ============================================================
+// 🔮 AI DIET GENERATOR WIZARD
+// ============================================================
+export async function generateNutritionPlanByAI(wizardData, options = {}) {
+    const { onProgress } = options;
+    const userEmail = await getAuthenticatedEmail();
+    const targetMeals = Math.max(3, Math.min(6, Number(wizardData?.mealCount || 4)));
+
+    if (onProgress) onProgress({ stage: 'queued', percent: 10 });
+
+    try {
+        if (onProgress) onProgress({ stage: 'llm', percent: 40 });
+
+        const systemMessage = {
+            role: 'system',
+            content: `Você é um nutricionista clínico de altíssimo nível. Foi solicitado para você criar um planejamento alimentar seguro e personalizado para um paciente.
+
+INFORMAÇÕES DO PACIENTE:
+- Idade: ${wizardData.age || 'Não informada'}
+- Sexo: ${wizardData.gender || 'Não informado'}
+- Altura: ${wizardData.height ? wizardData.height + ' cm' : 'Não informada'}
+- Peso: ${wizardData.weight ? wizardData.weight + ' kg' : 'Não informado'}
+- Nível de Atividade: ${wizardData.activityLevel || 'Não informado'}
+- Objetivo: ${wizardData.goal || 'Manutenção'}
+- Restrições/Alergias: ${wizardData.restrictions?.length ? wizardData.restrictions.join(', ') : 'Nenhuma'}
+- Aversões: ${wizardData.aversions || 'Nenhuma'}
+- Orçamento da dieta: ${wizardData.budget || 'Padrão'}
+- Quantidade de refeições pedidas: ${targetMeals}
+
+OBJETIVO:
+Crie um plano alimentar completo que respeite RIGOROSAMENTE essas características. Calcule o metabolismo basal aproximado (TMB) e adicione o fator de atividade e superávit/déficit para encontrar as calorias diárias totais e os macronutrientes ideais. Divida essas calorias pelas refeições solicitadas.
+
+Retorne APENAS um JSON VÁLIDO e mais nada, sem blocos de código markdown ou explicações. Obrigatório:
+- O array "meals" deve conter EXATAMENTE ${targetMeals} refeições.
+- Não retornar apenas café da manhã.
+- Distribuir as refeições em horários realistas (ex: café, lanche manhã, almoço, lanche tarde, jantar, ceia quando aplicável).
+
+Formato EXATO:
+{
+  "summary": "Resumo clinico explicativo sobre o plano montado, o porquê destas calorias e dicas para alcançar o objetivo",
+  "dailyMacros": { "calories": 2000, "protein": 150, "carbs": 200, "fats": 66 },
+  "meals": [
+    { 
+      "time": "Café da Manhã", 
+      "name": "Opções de Desjejum", 
+      "calories": 400, 
+      "protein": 30, 
+      "carbs": 40, 
+      "fats": 13, 
+      "ingredients": [
+        "Opção 1: 3 ovos mexidos com 2 fatias de pão de forma", 
+        "Opção 2: 150g de iogurte natural + 30g de whey + 1 banana"
+      ] 
+    }
+  ],
+  "suggestions": [
+    "Beba pelo menos 3L de água",
+    "Durma bem"
+  ],
+  "mealCount": ${targetMeals}
+}`
+        };
+
+        const completion = await createChatCompletion({
+            model: AI_MODEL,
+            messages: [systemMessage],
+            stream: false,
+            originFunction: 'generateNutritionPlanByAI',
+            userEmail
+        });
+
+        const responseText = completion.choices?.[0]?.message?.content || '';
+        const analysis = parseAIJsonResponse(responseText);
+
+        if (!analysis || typeof analysis !== 'object') {
+            throw new Error('A inteligência artificial retornou um formato inválido. Por favor, tente novamente.');
+        }
+
+        // Normalize the payload to prevent frontend React crashes (map is not a function etc)
+        let normalizedAnalysis = {
+            summary: typeof analysis.summary === 'string' ? analysis.summary : 'Plano alimentar personalizado.',
+            suggestions: Array.isArray(analysis.suggestions) ? analysis.suggestions : [],
+            dailyMacros: {
+                calories: analysis.dailyMacros?.calories || 0,
+                protein: analysis.dailyMacros?.protein || 0,
+                carbs: analysis.dailyMacros?.carbs || 0,
+                fats: analysis.dailyMacros?.fats || 0,
+            },
+            meals: Array.isArray(analysis.meals) ? dedupePlanMeals(analysis.meals) : []
+        };
+
+        if (normalizedAnalysis.meals.length < targetMeals) {
+            const extraMeals = await completeMissingMealsWithAI({
+                wizardData,
+                currentAnalysis: normalizedAnalysis,
+                targetMeals,
+                userEmail
+            });
+            normalizedAnalysis = {
+                ...normalizedAnalysis,
+                meals: dedupePlanMeals([...normalizedAnalysis.meals, ...extraMeals]).slice(0, targetMeals)
+            };
+        }
+
+        if (normalizedAnalysis.meals.length < targetMeals) {
+            const fallbackMeals = buildFallbackMeals({
+                targetMeals,
+                dailyMacros: normalizedAnalysis.dailyMacros,
+                existingMeals: normalizedAnalysis.meals
+            });
+            normalizedAnalysis = {
+                ...normalizedAnalysis,
+                meals: dedupePlanMeals([...normalizedAnalysis.meals, ...fallbackMeals]).slice(0, targetMeals)
+            };
+        }
+
+        if (normalizedAnalysis.meals.length === 0) {
+            throw new Error('O plano gerado está vazio. Por favor, tente novamente para novas opções.');
+        }
+
+        if (onProgress) onProgress({ stage: 'save', percent: 80 });
+
+        const { data: record, error: dbError } = await dbOperation(() => supabase
+            .from('nutrixo_plans')
+            .insert([{
+                user_email: userEmail,
+                file_name: 'Plano Gerado por IA',
+                file_url: null,
+                file_key: null,
+                status: 'completed',
+                analysis: normalizedAnalysis
+            }])
+            .select()
+            .single()
+        );
+
+        if (dbError) throw dbError;
+
+        if (onProgress) onProgress({ stage: 'completed', percent: 100 });
+        return { id: record.id, analysis: normalizedAnalysis };
+
+    } catch (error) {
+        const normalized = normalizeAnalysisError(error, 'Erro ao gerar o plano com IA.');
+        throw new Error(normalized);
+    }
+}
+
+export async function importGeneratedPlanToNutritionPlan(planAnalysis, options = {}) {
+    const { existingPlanId = null, fileName = 'Plano Importado da IA' } = options;
+    const userEmail = await getAuthenticatedEmail();
+    const meals = Array.isArray(planAnalysis?.meals) ? dedupePlanMeals(planAnalysis.meals) : [];
+
+    if (meals.length === 0) {
+        throw new Error('Nenhuma refeição válida encontrada para importação.');
+    }
+
+    const normalizedAnalysis = {
+        summary: typeof planAnalysis?.summary === 'string' ? planAnalysis.summary : 'Plano alimentar importado.',
+        suggestions: Array.isArray(planAnalysis?.suggestions) ? planAnalysis.suggestions : [],
+        dailyMacros: {
+            calories: Number(planAnalysis?.dailyMacros?.calories || 0),
+            protein: Number(planAnalysis?.dailyMacros?.protein || 0),
+            carbs: Number(planAnalysis?.dailyMacros?.carbs || 0),
+            fats: Number(planAnalysis?.dailyMacros?.fats || 0),
+        },
+        meals
+    };
+
+    if (existingPlanId) {
+        const { data, error } = await supabase
+            .from('nutrixo_plans')
+            .update({
+                analysis: normalizedAnalysis,
+                status: 'completed',
+                file_name: fileName
+            })
+            .eq('id', existingPlanId)
+            .eq('user_email', userEmail)
+            .select('id')
+            .single();
+
+        if (error) throw new Error(error.message || 'Erro ao atualizar plano alimentar importado.');
+        return { id: data.id, created: false, updated: true };
+    }
+
+    const { data, error } = await supabase
+        .from('nutrixo_plans')
+        .insert([{
+            user_email: userEmail,
+            file_name: fileName,
+            file_url: null,
+            file_key: null,
+            status: 'completed',
+            analysis: normalizedAnalysis
+        }])
+        .select('id')
+        .single();
+
+    if (error) throw new Error(error.message || 'Erro ao importar plano alimentar.');
+
+    return { id: data.id, created: true, updated: false };
+}
+
+// ============================================================
 // 📸 FOOD - Analyze food photo with AI Vision
 // ============================================================
 export async function analyzeFoodPhoto(file, mealType) {
@@ -1539,6 +1854,14 @@ export async function reanalyzeMealEntry(mealId, { description, mealType }) {
 // 🤖 CHATBOT - AI-powered health assistant
 // ============================================================
 export async function chatWithAssistant(messages, userContext = {}) {
+    let userEmail = null;
+    try {
+        // Tentamos pegar o email da sessão para plugar no log
+        userEmail = await getAuthenticatedEmail();
+    } catch {
+        // Ignora erro se não estiver logado, o chat apenas será logado como unknow
+    }
+
     const systemMessage = {
         role: 'system',
         content: `Você é o Nutrixo, um assistente de saúde e nutrição amigável e profissional. Você ajuda com:
@@ -1627,6 +1950,18 @@ export async function getMeasurementHistory() {
     const userEmail = await getAuthenticatedEmail();
     const { data, error } = await supabase
         .from('nutrixo_measurements')
+        .select('*')
+        .eq('user_email', userEmail)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+}
+
+export async function getNutritionPlanHistory() {
+    const userEmail = await getAuthenticatedEmail();
+    const { data, error } = await supabase
+        .from('nutrixo_plans')
         .select('*')
         .eq('user_email', userEmail)
         .order('created_at', { ascending: false });
@@ -1725,41 +2060,280 @@ function buildInsightFacts({ latestExam, measurement, plan, todayMeals }) {
         });
     }
 
-    if (Array.isArray(todayMeals) && todayMeals.length > 0) {
-        const totals = todayMeals.reduce((acc, meal) => {
+    const totals = Array.isArray(todayMeals) && todayMeals.length > 0
+        ? todayMeals.reduce((acc, meal) => {
             acc.calories += Number(meal?.calories || 0);
             acc.protein += Number(meal?.protein || 0);
             acc.carbs += Number(meal?.carbs || 0);
             acc.fats += Number(meal?.fats || 0);
             return acc;
-        }, { calories: 0, protein: 0, carbs: 0, fats: 0 });
+        }, { calories: 0, protein: 0, carbs: 0, fats: 0 })
+        : { calories: 0, protein: 0, carbs: 0, fats: 0 };
 
-        facts.push({
-            id: 'meals:today-totals',
-            domain: 'meals',
-            severity: 'info',
-            status: 'normal',
-            text: `Consumo hoje: ${Math.round(totals.calories)} kcal, proteína ${Math.round(totals.protein)}g, carbo ${Math.round(totals.carbs)}g, gordura ${Math.round(totals.fats)}g`,
+    facts.push({
+        id: 'meals:today-totals',
+        domain: 'meals',
+        severity: 'info',
+        status: 'normal',
+        text: `Consumo hoje: ${Math.round(totals.calories)} kcal, proteína ${Math.round(totals.protein)}g, carbo ${Math.round(totals.carbs)}g, gordura ${Math.round(totals.fats)}g`,
+    });
+
+    // Fatos objetivos de aderência ao plano (evitam insight incoerente quando há excesso).
+    if (dailyMacros && Object.keys(dailyMacros).length > 0) {
+        const comparisons = [
+            { key: 'calories', label: 'calorias', unit: 'kcal' },
+            { key: 'protein', label: 'proteína', unit: 'g' },
+            { key: 'carbs', label: 'carboidratos', unit: 'g' },
+            { key: 'fats', label: 'gorduras', unit: 'g' },
+        ];
+
+        comparisons.forEach(({ key, label, unit }) => {
+            const goal = Number(dailyMacros[key] || 0);
+            if (goal <= 0) return;
+            const consumed = Number(totals[key] || 0);
+            const delta = consumed - goal;
+            const over = delta > 0;
+            const status = over ? 'high' : 'normal';
+
+            facts.push({
+                id: `nutrition:${key}-balance`,
+                domain: 'meals',
+                severity: over ? 'alert' : 'info',
+                status,
+                text: over
+                    ? `Consumo de ${label} acima da meta: ${Math.round(consumed)}${unit} consumidos vs ${Math.round(goal)}${unit} planejados (excesso de ${Math.round(delta)}${unit}).`
+                    : `Consumo de ${label} dentro da meta: ${Math.round(consumed)}${unit} consumidos de ${Math.round(goal)}${unit}.`,
+            });
         });
     }
 
     return facts;
 }
 
-function buildInsightsFallbackFromFacts(facts = []) {
-    const ordered = [...facts].sort((a, b) => {
-        const aPrio = a.severity === 'alert' ? 1 : 2;
-        const bPrio = b.severity === 'alert' ? 1 : 2;
-        return aPrio - bPrio;
+function getInsightDomainBucket(domain = '') {
+    if (domain === 'exam') return 'exam';
+    if (domain === 'measurement') return 'measurement';
+    if (domain === 'plan' || domain === 'meals') return 'nutrition';
+    return 'other';
+}
+
+function getRequiredInsightBuckets(facts = []) {
+    const buckets = new Set(
+        facts.map((fact) => getInsightDomainBucket(fact?.domain))
+            .filter((bucket) => ['exam', 'measurement', 'nutrition'].includes(bucket))
+    );
+    return ['nutrition', 'measurement', 'exam'].filter((bucket) => buckets.has(bucket));
+}
+
+function balanceInsightsByDomain(insights = [], facts = [], max = 3) {
+    if (!Array.isArray(insights) || insights.length === 0) return [];
+
+    const selected = [];
+    const selectedFactIds = new Set();
+    const requiredBuckets = getRequiredInsightBuckets(facts);
+
+    // Primeiro garante cobertura de domínio (nutrição, medidas, exames), se houver dados.
+    requiredBuckets.forEach((bucket) => {
+        if (selected.length >= max) return;
+        const match = insights.find((insight) => {
+            if (selectedFactIds.has(insight.factId)) return false;
+            return getInsightDomainBucket(insight.domain) === bucket;
+        });
+        if (match) {
+            selected.push(match);
+            selectedFactIds.add(match.factId);
+        }
     });
 
-    return ordered.slice(0, 3).map((fact, idx) => ({
+    // Depois completa por prioridade (warning > tip > positive) e ordem original.
+    const priority = { warning: 1, tip: 2, positive: 3 };
+    const orderedRemaining = insights
+        .filter((insight) => !selectedFactIds.has(insight.factId))
+        .sort((a, b) => (priority[a.type] || 9) - (priority[b.type] || 9));
+
+    for (const insight of orderedRemaining) {
+        if (selected.length >= max) break;
+        selected.push(insight);
+    }
+
+    return selected.slice(0, max);
+}
+
+function buildInsightsFallbackFromFacts(facts = []) {
+    const requiredBuckets = getRequiredInsightBuckets(facts);
+    const selectedFacts = [];
+    const selectedFactIds = new Set();
+
+    // Cobertura por domínio no fallback também.
+    requiredBuckets.forEach((bucket) => {
+        const match = facts.find((fact) => {
+            if (selectedFactIds.has(fact.id)) return false;
+            return getInsightDomainBucket(fact.domain) === bucket;
+        });
+        if (match) {
+            selectedFacts.push(match);
+            selectedFactIds.add(match.id);
+        }
+    });
+
+    // Completa por prioridade.
+    const ordered = [...facts]
+        .filter((fact) => !selectedFactIds.has(fact.id))
+        .sort((a, b) => {
+            const aPrio = a.severity === 'alert' ? 1 : 2;
+            const bPrio = b.severity === 'alert' ? 1 : 2;
+            return aPrio - bPrio;
+        });
+
+    for (const fact of ordered) {
+        if (selectedFacts.length >= 3) break;
+        selectedFacts.push(fact);
+    }
+
+    return selectedFacts.slice(0, 3).map((fact, idx) => ({
         id: `fallback-${idx + 1}`,
         type: fact.severity === 'alert' ? 'warning' : 'tip',
-        title: fact.severity === 'alert' ? 'Alerta baseado no exame' : 'Resumo do seu dado atual',
+        title: fact.severity === 'alert' ? 'Alerta baseado nos seus dados' : 'Resumo do seu dado atual',
         description: fact.text.slice(0, 150),
         factId: fact.id,
     }));
+}
+
+function buildInsightFromFact(fact, idPrefix = 'fallback-critical') {
+    return {
+        id: `${idPrefix}:${fact.id}`,
+        type: fact.severity === 'alert' ? 'warning' : 'tip',
+        title: fact.severity === 'alert' ? 'Atenção ao seu consumo atual' : 'Resumo do seu dado atual',
+        description: String(fact.text || '').slice(0, 150),
+        factId: fact.id,
+        domain: fact.domain || 'other',
+        severity: fact.severity || 'info',
+    };
+}
+
+function enforceCriticalInsightCoverage(insights = [], facts = [], max = 3) {
+    if (!Array.isArray(insights) || insights.length === 0) return insights;
+
+    const selected = [...insights];
+    const selectedFactIds = new Set(selected.map((item) => item.factId));
+    const priority = { warning: 1, tip: 2, positive: 3 };
+    const alertFacts = facts.filter((fact) => fact?.severity === 'alert');
+    const nutritionAlertFacts = alertFacts.filter((fact) => getInsightDomainBucket(fact?.domain) === 'nutrition');
+
+    const replaceWorstIfNeeded = (insightToInsert) => {
+        if (selected.length < max) {
+            selected.push(insightToInsert);
+            selectedFactIds.add(insightToInsert.factId);
+            return;
+        }
+        // substitui o insight menos prioritário (positive > tip > warning),
+        // evitando remover um alerta já presente.
+        let replaceIdx = -1;
+        let worstScore = -1;
+        selected.forEach((item, idx) => {
+            const score = priority[item.type] || 9;
+            const isAlert = item.type === 'warning';
+            const effectiveScore = isAlert ? -1 : score;
+            if (effectiveScore > worstScore) {
+                worstScore = effectiveScore;
+                replaceIdx = idx;
+            }
+        });
+        if (replaceIdx >= 0) {
+            selected[replaceIdx] = insightToInsert;
+            selectedFactIds.add(insightToInsert.factId);
+        }
+    };
+
+    // Regra 1: se existe alerta nutricional, garantir pelo menos 1 insight desse alerta.
+    if (nutritionAlertFacts.length > 0) {
+        const hasNutritionAlertInsight = selected.some((item) => {
+            const bucket = getInsightDomainBucket(item?.domain);
+            return item?.type === 'warning' && bucket === 'nutrition';
+        });
+        if (!hasNutritionAlertInsight) {
+            const fact = nutritionAlertFacts[0];
+            replaceWorstIfNeeded(buildInsightFromFact(fact, 'critical-nutrition'));
+        }
+    }
+
+    // Regra 2: se existe qualquer alerta, garantir pelo menos 1 warning.
+    const hasWarning = selected.some((item) => item?.type === 'warning');
+    if (!hasWarning && alertFacts.length > 0) {
+        const fact = alertFacts[0];
+        if (!selectedFactIds.has(fact.id)) {
+            replaceWorstIfNeeded(buildInsightFromFact(fact, 'critical-alert'));
+        }
+    }
+
+    return selected.slice(0, max);
+}
+
+function enforcePositiveCoverageWhenHealthy(insights = [], facts = [], max = 3) {
+    if (!Array.isArray(insights) || insights.length === 0) return insights;
+
+    const hasAlertFacts = facts.some((fact) => fact?.severity === 'alert');
+    if (hasAlertFacts) return insights;
+
+    const hasPositive = insights.some((insight) => insight?.type === 'positive');
+    if (hasPositive) return insights;
+
+    const selected = [...insights];
+    const candidateFacts = facts.filter((fact) => fact?.severity !== 'alert');
+    if (candidateFacts.length === 0) return insights;
+
+    const preferred =
+        candidateFacts.find((fact) => getInsightDomainBucket(fact.domain) === 'nutrition') ||
+        candidateFacts.find((fact) => getInsightDomainBucket(fact.domain) === 'exam') ||
+        candidateFacts[0];
+
+    const positiveInsight = {
+        id: `healthy-positive:${preferred.id}`,
+        type: 'positive',
+        title: 'Bom trabalho no seu acompanhamento',
+        description: String(preferred.text || '').slice(0, 150),
+        factId: preferred.id,
+        domain: preferred.domain || 'other',
+        severity: preferred.severity || 'info',
+    };
+
+    if (selected.length < max) {
+        selected.push(positiveInsight);
+        return selected.slice(0, max);
+    }
+
+    // Substitui um tip para garantir ao menos um positivo.
+    const tipIdx = selected.findIndex((item) => item?.type === 'tip');
+    if (tipIdx >= 0) {
+        selected[tipIdx] = positiveInsight;
+        return selected.slice(0, max);
+    }
+
+    // Se não houver tip, substitui o último.
+    selected[selected.length - 1] = positiveInsight;
+    return selected.slice(0, max);
+}
+
+function normalizeInsightByFact(insight, fact) {
+    if (!fact) return insight;
+
+    const next = { ...insight };
+    const text = `${next.title} ${next.description}`.toLowerCase();
+    const saysNormal = text.includes('normal') || text.includes('dentro da faixa') || text.includes('equilibrad');
+
+    if (fact.severity === 'alert') {
+        next.type = 'warning';
+        if (saysNormal) {
+            next.title = 'Atenção ao seu consumo atual';
+            next.description = fact.text.slice(0, 150);
+        }
+    }
+
+    if (fact.severity !== 'alert' && next.type === 'warning') {
+        next.type = 'tip';
+    }
+
+    return next;
 }
 
 export async function generateHealthInsights() {
@@ -1803,6 +2377,8 @@ export async function generateHealthInsights() {
                     }
                     Regras obrigatórias:
                     - Use EXATAMENTE 3 insights.
+                    - Priorize cobertura dos domínios disponíveis: alimentação (plano/refeições), medidas e exames.
+                    - Se houver fatos desses 3 domínios, inclua pelo menos 1 insight de cada domínio.
                     - Todo insight DEVE referenciar factId válido.
                     - NÃO invente qualquer métrica que não exista nos fatos.
                     Retorne APENAS o JSON.`;
@@ -1826,32 +2402,43 @@ export async function generateHealthInsights() {
         });
 
         const parsed = parseAIJsonResponse(completion.choices[0].message.content);
+        const factsById = new Map(facts.map((fact) => [fact.id, fact]));
         const factIds = new Set(facts.map((f) => f.id));
         const insights = Array.isArray(parsed?.insights) ? parsed.insights : [];
 
         const validated = insights
             .filter((insight) => insight && typeof insight === 'object')
             .filter((insight) => factIds.has(String(insight.factId || '')))
-            .map((insight, idx) => ({
-                id: insight.id || `insight-${idx + 1}`,
-                type: ['positive', 'warning', 'tip'].includes(insight.type) ? insight.type : 'tip',
-                title: String(insight.title || 'Insight').slice(0, 80),
-                description: String(insight.description || '').slice(0, 150),
-                factId: String(insight.factId),
-            }))
-            .slice(0, 3);
+            .map((insight, idx) => {
+                const factId = String(insight.factId);
+                const fact = factsById.get(factId);
+                const normalized = normalizeInsightByFact({
+                    id: insight.id || `insight-${idx + 1}`,
+                    type: ['positive', 'warning', 'tip'].includes(insight.type) ? insight.type : 'tip',
+                    title: String(insight.title || 'Insight').slice(0, 80),
+                    description: String(insight.description || '').slice(0, 150),
+                    factId,
+                    domain: fact?.domain || 'other',
+                    severity: fact?.severity || 'info',
+                }, fact);
+                return normalized;
+            });
 
-        if (validated.length === 0) {
+        const balanced = balanceInsightsByDomain(validated, facts, 3);
+        const withCriticalCoverage = enforceCriticalInsightCoverage(balanced, facts, 3);
+        const withHealthyPositive = enforcePositiveCoverageWhenHealthy(withCriticalCoverage, facts, 3);
+
+        if (withHealthyPositive.length === 0) {
             return buildInsightsFallbackFromFacts(facts);
         }
 
-        if (validated.length < 3) {
+        if (withHealthyPositive.length < 3) {
             const fallback = buildInsightsFallbackFromFacts(facts)
-                .filter((item) => !validated.some((v) => v.factId === item.factId));
-            return [...validated, ...fallback].slice(0, 3);
+                .filter((item) => !withHealthyPositive.some((v) => v.factId === item.factId));
+            return enforcePositiveCoverageWhenHealthy([...withHealthyPositive, ...fallback].slice(0, 3), facts, 3);
         }
 
-        return validated;
+        return withHealthyPositive;
 
     } catch (error) {
         console.error("Erro ao gerar insights por IA:", error);

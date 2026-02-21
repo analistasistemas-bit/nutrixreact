@@ -1,9 +1,13 @@
 import React from 'react';
 import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
-import { Flame, Droplet, Circle, ChevronDown } from 'lucide-react';
+import { Flame, Droplet, Circle, ChevronDown, AlertTriangle } from 'lucide-react';
+import { formatPtBrNumber } from '../lib/numberLocale';
 
-const NutrientCard = ({ icon: Icon, title, consumed, goal, unit, colorClass, gradientClass, glowColor, compact }) => {
+const NutrientCard = ({ icon: Icon, iconProps, title, consumed, goal, unit, colorClass, gradientClass, glowColor, compact }) => {
     const percentage = goal > 0 ? Math.min((consumed / goal) * 100, 100) : (consumed > 0 ? 100 : 0);
+    const isExceeded = goal > 0 && consumed > goal;
+    const remaining = goal > 0 ? Math.max(goal - consumed, 0) : 0;
+    const exceededBy = goal > 0 ? Math.max(consumed - goal, 0) : 0;
 
     return (
         <motion.div
@@ -19,15 +23,34 @@ const NutrientCard = ({ icon: Icon, title, consumed, goal, unit, colorClass, gra
                 },
                 scale: { duration: 0.2 }
             }}
-            className={`relative overflow-hidden bg-white/60 dark:bg-zinc-800/40 backdrop-blur-md rounded-2xl p-4 border border-white/20 dark:border-white/5 transition-all duration-300 shadow-lg shadow-black/5`}
+            className={`relative overflow-hidden bg-white/60 dark:bg-zinc-800/40 backdrop-blur-md rounded-2xl p-4 border transition-all duration-300 shadow-lg shadow-black/5 ${isExceeded
+                ? 'border-red-300 dark:border-red-700 ring-1 ring-red-300/70 dark:ring-red-700/70'
+                : 'border-white/20 dark:border-white/5'
+                }`}
         >
             <div className="flex items-center space-x-2 mb-3">
-                {React.createElement(Icon, { className: `w-5 h-5 ${colorClass}` })}
+                {React.createElement(Icon, { className: `w-5 h-5 ${colorClass} ${iconProps?.className || ''}` })}
                 <h3 className={`font-bold text-zinc-900 dark:text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</h3>
             </div>
-            <div className="mb-2">
-                <span className={`${compact ? 'text-lg' : 'text-2xl'} font-black text-zinc-900 dark:text-text-primary`}>{consumed}</span>
-                <span className={`text-zinc-600 dark:text-text-muted ml-1 font-medium ${compact ? 'text-[10px]' : 'text-xs'}`}>{unit || `/ ${goal}`}</span>
+            <div className="mb-3 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-text-muted">
+                    Consumido
+                </p>
+                <div className="flex items-end gap-1.5">
+                    <span className={`${compact ? 'text-lg' : 'text-2xl'} font-black text-zinc-900 dark:text-text-primary leading-none`}>
+                        {formatPtBrNumber(consumed)}
+                    </span>
+                    {unit && (
+                        <span className={`text-zinc-600 dark:text-text-muted font-semibold ${compact ? 'text-[10px]' : 'text-xs'}`}>
+                            {unit}
+                        </span>
+                    )}
+                </div>
+                {goal > 0 && (
+                    <p className="text-[11px] font-semibold text-zinc-500 dark:text-text-muted">
+                        Meta: {formatPtBrNumber(goal)} {unit}
+                    </p>
+                )}
             </div>
             <div className="relative pt-1">
                 <div className={`overflow-hidden ${compact ? 'h-1.5' : 'h-2'} rounded-full bg-zinc-200/50 dark:bg-zinc-900/50`}>
@@ -39,9 +62,15 @@ const NutrientCard = ({ icon: Icon, title, consumed, goal, unit, colorClass, gra
                     ></motion.div>
                 </div>
             </div>
-            {!compact && goal > 0 && (
-                <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-text-muted">
-                    {Math.max(goal - consumed, 0)}{unit || 'g'} restantes
+            {!compact && goal > 0 && !isExceeded && (
+                <div className="mt-3 text-[11px] font-semibold text-zinc-500 dark:text-text-muted">
+                    {formatPtBrNumber(remaining)} {unit} restantes
+                </div>
+            )}
+            {!compact && goal > 0 && isExceeded && (
+                <div className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                    <AlertTriangle className="w-3 h-3" />
+                    Ultrapassou por {formatPtBrNumber(exceededBy)} {unit}
                 </div>
             )}
         </motion.div>
@@ -56,6 +85,7 @@ const MacroNutrientsCard = ({ calories, macroNutrients, compact = false }) => {
                 title="Calorias"
                 consumed={calories.consumed}
                 goal={calories.goal}
+                unit="kcal"
                 colorClass="text-orange-500"
                 gradientClass="bg-gradient-to-r from-orange-500 to-amber-600 dark:from-orange-600 dark:to-orange-400"
                 glowColor="rgba(249, 115, 22, 0.25)"

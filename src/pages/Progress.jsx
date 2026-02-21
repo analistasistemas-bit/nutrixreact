@@ -585,6 +585,19 @@ const parseReferenceRange = (refString) => {
     return parsePtBrReferenceRange(refString);
 };
 
+// Helper: Calcula a data de corte para o filtro de período
+const getTimeCutoff = (filter) => {
+    const d = new Date();
+    switch (filter) {
+        case '7d':  d.setDate(d.getDate() - 7);         break;
+        case '30d': d.setDate(d.getDate() - 30);        break;
+        case '3m':  d.setMonth(d.getMonth() - 3);       break;
+        case '1a':  d.setFullYear(d.getFullYear() - 1); break;
+        default:    return null;
+    }
+    return d;
+};
+
 
 
 
@@ -749,15 +762,20 @@ const Progress = () => {
 
     // --- Helpers de Dados (Definidos no topo para evitar Reference Errors) ---
     const getBiomarkerTrend = useCallback((name) => {
+        const cutoff = getTimeCutoff(timeFilter);
         const trend = [];
-        [...exams].reverse().forEach(exam => {
-            const b = exam.analysis?.biomarkers?.find(x => x.name === name);
-            if (b) trend.push({ value: b.value, date: new Date(exam.created_at).toLocaleDateString('pt-BR'), unit: b.unit });
-        });
+        [...exams]
+            .filter(e => !cutoff || new Date(e.created_at) >= cutoff)
+            .reverse()
+            .forEach(exam => {
+                const b = exam.analysis?.biomarkers?.find(x => x.name === name);
+                if (b) trend.push({ value: b.value, date: new Date(exam.created_at).toLocaleDateString('pt-BR'), unit: b.unit });
+            });
         return trend;
-    }, [exams]);
+    }, [exams, timeFilter]);
 
     const getMeasurementTrend = useCallback((key) => {
+        const cutoff = getTimeCutoff(timeFilter);
         const trend = [];
         const findValue = (obj, targetKey) => {
             if (!obj || typeof obj !== 'object') return undefined;
@@ -778,21 +796,24 @@ const Progress = () => {
             }
             return undefined;
         };
-        [...measurements].reverse().forEach(m => {
-            const valData = findValue(m.analysis?.measurements || m.analysis, key);
-            if (valData && valData.value !== null && valData.value !== undefined) {
-                const numericVal = parseNumberVal(valData.value);
-                if (!isNaN(numericVal)) {
-                    trend.push({
-                        value: numericVal,
-                        date: new Date(m.created_at).toLocaleDateString('pt-BR'),
-                        unit: valData.unit || ''
-                    });
+        [...measurements]
+            .filter(m => !cutoff || new Date(m.created_at) >= cutoff)
+            .reverse()
+            .forEach(m => {
+                const valData = findValue(m.analysis?.measurements || m.analysis, key);
+                if (valData && valData.value !== null && valData.value !== undefined) {
+                    const numericVal = parseNumberVal(valData.value);
+                    if (!isNaN(numericVal)) {
+                        trend.push({
+                            value: numericVal,
+                            date: new Date(m.created_at).toLocaleDateString('pt-BR'),
+                            unit: valData.unit || ''
+                        });
+                    }
                 }
-            }
-        });
+            });
         return trend;
-    }, [measurements]);
+    }, [measurements, timeFilter]);
 
 
     useEffect(() => {
@@ -1367,7 +1388,12 @@ const Progress = () => {
                     <h1 className="text-2xl font-bold dark:text-white flex items-center gap-3">
                         <Activity className="text-cyan-500" /> Hub de Progresso
                     </h1>
-                    <p className="text-zinc-500 text-sm">Entenda como sua saúde evoluiu nos últimos {timeFilter === '30d' ? '30 dias' : timeFilter === '90d' ? '90 dias' : '365 dias'}.</p>
+                    <p className="text-zinc-500 text-sm">
+                        {timeFilter === '7d'  ? 'Entenda como sua saúde evoluiu nos últimos 7 dias.'
+                        : timeFilter === '30d' ? 'Entenda como sua saúde evoluiu nos últimos 30 dias.'
+                        : timeFilter === '3m'  ? 'Entenda como sua saúde evoluiu nos últimos 3 meses.'
+                        : 'Entenda como sua saúde evoluiu no último ano.'}
+                    </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
@@ -1409,17 +1435,22 @@ const Progress = () => {
                         </div>
                     )}
 
-                    <div className="flex items-center gap-2 p-1.5 bg-zinc-100 dark:bg-bg-secondary rounded-2xl border border-zinc-200 dark:border-border-subtle shadow-inner">
-                        {['30d', '90d', '1y'].map(period => (
+                    <div className="flex items-center gap-1 p-1.5 bg-zinc-100 dark:bg-bg-secondary rounded-2xl border border-zinc-200 dark:border-border-subtle shadow-inner">
+                        {[
+                            { value: '7d',  label: '7D' },
+                            { value: '30d', label: '30D' },
+                            { value: '3m',  label: '3M' },
+                            { value: '1a',  label: '1A' },
+                        ].map(({ value, label }) => (
                             <button
-                                key={period}
-                                onClick={() => setTimeFilter(period)}
-                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${timeFilter === period
+                                key={value}
+                                onClick={() => setTimeFilter(value)}
+                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${timeFilter === value
                                     ? 'bg-white dark:bg-zinc-700 text-cyan-600 dark:text-cyan-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
                                     : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
                                     }`}
                             >
-                                {period}
+                                {label}
                             </button>
                         ))}
                     </div>
