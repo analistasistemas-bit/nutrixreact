@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import {
     ChartLine,
@@ -41,40 +41,6 @@ import { getExamHistory, getMeasurementHistory, generateHealthInsights } from '.
 import BiomarkerDetailDrawer from '../components/BiomarkerDetailDrawer';
 import { useGamification } from '../hooks/useGamification';
 import { formatPtBrNumber, parsePtBrNumber, parsePtBrReferenceRange } from '../lib/numberLocale';
-
-// --- Tooltip Component ---
-const InfoTooltip = ({ content, align = "left" }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const tooltipRef = useRef(null);
-
-    // Fechar se clicar fora
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (tooltipRef.current && !tooltipRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    return (
-        <div className="relative flex items-center p-1 -ml-1 cursor-pointer" ref={tooltipRef} onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}>
-            <Info className={`w-4 h-4 transition-colors ${isOpen ? 'text-zinc-600 dark:text-white' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}`} />
-
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }} transition={{ duration: 0.15 }}
-                        className={`absolute top-full mt-2 w-64 p-3 bg-zinc-800 dark:bg-zinc-700 text-[11px] leading-relaxed text-zinc-300 dark:text-zinc-200 rounded-xl shadow-xl z-[9999] normal-case tracking-normal font-normal text-left ${align === 'center' ? 'left-1/2 -translate-x-1/2' : align === 'right' ? 'right-0' : 'left-0'}`}
-                    >
-                        {content}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-};
 
 // --- Sub-componente: InsightDrawer (Painel Lateral Contextual) ---
 const InsightDrawer = ({ isOpen, onClose }) => {
@@ -687,13 +653,17 @@ const HealthScoreGauge = ({ score = 85, previousScore = 80 }) => {
 
     return (
         <div className="flex flex-col items-center justify-center p-8 bg-white dark:bg-bg-elevated border border-zinc-100 dark:border-border-subtle rounded-[2.5rem] shadow-sm relative h-full">
-            <div className="absolute top-6 left-6 flex items-center gap-2 z-10">
+            <div className="absolute top-6 left-6 flex items-center gap-2 group cursor-help">
                 <ShieldCheck className="w-5 h-5 text-cyan-500" />
                 <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">NutriScore</h3>
-                <InfoTooltip content="O NutriScore calcula a sua nota geral de saúde baseando-se na proporção de biomarcadores e medidas que estão dentro dos intervalos ideais." />
+                <Info className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600 opacity-50 transition-opacity group-hover:opacity-100" />
+
+                <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-zinc-800 text-xs text-zinc-300 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                    O NutriScore calcula a sua nota geral de saúde baseando-se na proporção de biomarcadores e medidas que estão dentro dos intervalos ideais.
+                </div>
             </div>
             {/* Contexto Rápido */}
-            <div className="absolute top-6 right-6 z-10">
+            <div className="absolute top-6 right-6">
                 <div className={`px-3 py-1 rounded-full text-[10px] font-bold ${score >= 90 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : score >= 70 ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}`}>
                     {score >= 90 ? 'EXCELENTE' : score >= 70 ? 'BOM' : 'ATENÇÃO'}
                 </div>
@@ -748,7 +718,12 @@ const QuickStatsBanner = ({ stats }) => {
                         <div className="flex items-center gap-1.5 mb-1 relative">
                             <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{stat.label}</p>
                             {stat.tooltip && (
-                                <InfoTooltip content={stat.tooltip} align="center" />
+                                <div className="group relative flex items-center cursor-help p-1 -ml-1">
+                                    <Info className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 transition-colors group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />
+                                    <div className="absolute left-0 top-full mt-2 w-48 p-3 bg-zinc-800 dark:bg-zinc-700 text-xs text-zinc-300 dark:text-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[999] pointer-events-none normal-case tracking-normal font-normal">
+                                        {stat.tooltip}
+                                    </div>
+                                </div>
                             )}
                         </div>
                         <p className="text-xl font-bold dark:text-white leading-none tracking-tight">{stat.value}</p>
@@ -770,7 +745,14 @@ const GoalCard = ({ title, progress, description, icon: Icon, colorClass, toolti
                 <div>
                     <div className="flex items-center gap-1.5">
                         <h4 className="font-bold dark:text-white text-sm">{title}</h4>
-                        {tooltip && <InfoTooltip content={tooltip} />}
+                        {tooltip && (
+                            <div className="group relative flex items-center cursor-help p-1">
+                                <Info className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600 opacity-50 transition-opacity group-hover:opacity-100" />
+                                <div className="absolute left-0 top-full mt-1 w-64 p-3 bg-zinc-800 text-xs text-zinc-300 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100] pointer-events-none normal-case tracking-normal font-normal">
+                                    {tooltip}
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <p className="text-xs text-zinc-400 font-medium mt-0.5">{description}</p>
                 </div>
@@ -798,7 +780,12 @@ const CriticalAlerts = ({ alerts }) => {
                 <div className="flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5 text-rose-500" />
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Atenção Prioritária</h3>
-                    <InfoTooltip content="Marcadores que exigem intervenção clínica ou nutricional de curto prazo por estarem distantes da meta ideal." />
+                    <div className="group relative flex items-center cursor-help p-1 -ml-1">
+                        <Info className="w-4 h-4 text-zinc-400 dark:text-zinc-500 transition-colors group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />
+                        <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-zinc-800 dark:bg-zinc-700 text-xs text-zinc-300 dark:text-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[999] pointer-events-none normal-case tracking-normal font-normal">
+                            Marcadores que exigem intervenção clínica ou nutricional de curto prazo por estarem distantes da meta ideal.
+                        </div>
+                    </div>
                 </div>
                 <div className="h-px flex-1 bg-zinc-100 dark:bg-border-subtle ml-4" />
             </div>
@@ -886,62 +873,27 @@ const ConsistencyHeatmap = ({ records }) => {
         };
     });
 
-    const totalRecords = records.length;
-    const engagement = Math.round((totalRecords / Math.max(1, days)) * 100);
-
-    // Calculate Combo Atual
-    let currentCombo = 0;
-    for (let i = boxes.length - 1; i >= 0; i--) {
-        if (boxes[i].hasRecord) {
-            currentCombo++;
-        } else {
-            // Check if it's the very last day (today) missing a record - we might not break streak yet
-            if (i === boxes.length - 1) continue;
-            break;
-        }
-    }
-
-    // Dynamic Motivational Feedback
-    let feedbackTitle = "Dando os Primeiros Passos";
-    let feedbackText = "Registre seus dados para começarmos a entender seus padrões e evolução.";
-    let feedbackColor = "text-zinc-500";
-    let feedbackBg = "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700";
-
-    if (totalRecords === 0) {
-        feedbackTitle = "Abaixo do Radar";
-        feedbackText = "Você ainda não tem registros neste período. Cadastre seu primeiro dado hoje!";
-    } else if (engagement < 15) {
-        feedbackTitle = "Ritmo Inicial";
-        feedbackText = "Tente registrar dados toda semana para a inteligência da Sentinela afiar seus insights.";
-        feedbackColor = "text-amber-500";
-        feedbackBg = "bg-amber-100 dark:bg-amber-500/10 border-amber-200/50 dark:border-amber-500/20";
-    } else if (engagement < 40) {
-        feedbackTitle = "Ritmo Saudável";
-        feedbackText = `Com ${engagement}% de atividade recente, nosso modelo já avalia bem sua saúde. Mantenha o foco!`;
-        feedbackColor = "text-cyan-500";
-        feedbackBg = "bg-cyan-100 dark:bg-cyan-500/10 border-cyan-200/50 dark:border-cyan-500/20";
-    } else {
-        feedbackTitle = "Hábito de Ferro";
-        feedbackText = `Excepcional! ${engagement}% de frequência gera a maior precisão possível da Sentinela.`;
-        feedbackColor = "text-emerald-500";
-        feedbackBg = "bg-emerald-100 dark:bg-emerald-500/10 border-emerald-200/50 dark:border-emerald-500/20";
-    }
+    const streak = boxes.filter(b => b.hasRecord).length;
+    const engagement = Math.round((streak / Math.max(1, (records.length > 0 ? days : 1))) * 100);
 
     const weekDaysMap = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
     return (
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 p-6 sm:p-8 bg-white dark:bg-bg-elevated border border-zinc-100 dark:border-border-subtle rounded-[2.5rem] shadow-sm relative h-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 p-6 sm:p-8 bg-white dark:bg-bg-elevated border border-zinc-100 dark:border-border-subtle rounded-[2.5rem] shadow-sm relative h-full">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full -mr-10 -mt-10 blur-2xl pointer-events-none" />
-
-            {/* Lado Esquerdo: Heatmap */}
-            <div className="flex-[0.6] w-full relative z-10">
-                <div className="flex items-center gap-2 mb-4 relative z-10">
+            <div className="flex-1 w-full relative z-10">
+                <div className="flex items-center gap-2 mb-4 relative">
                     <Flame className="w-5 h-5 text-orange-500" />
                     <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Atividade (Últimos 28d)</h4>
-                    <InfoTooltip content="Verifique em quais dias você preencheu dados no aplicativo. Maior frequência melhora a assertividade do painel." />
+                    <div className="group relative flex items-center cursor-help p-1 -ml-1">
+                        <Info className="w-4 h-4 text-zinc-400 dark:text-zinc-500 transition-colors group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />
+                        <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-zinc-800 dark:bg-zinc-700 text-xs text-zinc-300 dark:text-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[999] pointer-events-none normal-case tracking-normal font-normal">
+                            Verifique em quais dias você preencheu dados no aplicativo, incluindo dias de exames ou medições. Maior frequência melhora seu painel.
+                        </div>
+                    </div>
                 </div>
                 {/* Calendário com dias */}
-                <div className="flex flex-col relative z-0">
+                <div className="flex flex-col">
                     <div className="grid grid-cols-7 gap-1.5 mb-1 opacity-90 mx-auto sm:mx-0 max-w-[fit-content]">
                         {boxes.slice(0, 7).map((b, i) => (
                             <div key={`header-${i}`} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">
@@ -962,35 +914,11 @@ const ConsistencyHeatmap = ({ records }) => {
                     </div>
                 </div>
             </div>
-
-            {/* Lado Direito: Gamificação e Insights */}
-            <div className="flex-[0.4] flex flex-col justify-between w-full md:w-auto mt-4 md:mt-0 md:border-l border-zinc-100 dark:border-zinc-800 md:pl-8 z-10 self-stretch">
-
-                {/* Métricas Topo */}
-                <div className="flex items-center gap-8 mb-6 mt-2">
-                    <div className="text-left">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Registros</p>
-                        <p className="text-4xl font-black text-zinc-800 dark:text-white leading-none tracking-tighter">{totalRecords}</p>
-                    </div>
-                    <div className="text-left">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1 flex items-center gap-1">
-                            Combo Atual <Flame className="w-3 h-3 text-orange-500" />
-                        </p>
-                        <p className="text-4xl font-black text-orange-500 leading-none tracking-tighter">
-                            {currentCombo}
-                            <span className="text-sm font-bold text-zinc-500 tracking-normal ml-1">dias</span>
-                        </p>
-                    </div>
+            <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto mt-4 sm:mt-0 sm:border-l border-zinc-100 dark:border-zinc-800 sm:pl-6 z-10">
+                <div className="text-left sm:text-right">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-zinc-500 mb-1">Total Registros</p>
+                    <p className="text-3xl font-black text-zinc-800 dark:text-white leading-none">{records.length}</p>
                 </div>
-
-                {/* Feedback Card */}
-                <div className={`p-4 rounded-2xl border ${feedbackBg}`}>
-                    <h4 className={`text-xs font-black uppercase tracking-widest mb-1 ${feedbackColor}`}>{feedbackTitle}</h4>
-                    <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
-                        {feedbackText}
-                    </p>
-                </div>
-
             </div>
         </div>
     );
@@ -1980,7 +1908,12 @@ const Progress = () => {
                                     <div className="flex items-center gap-2 mb-2 relative w-fit">
                                         <Target className="w-5 h-5 text-indigo-500" />
                                         <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">Metas Ativas</h3>
-                                        <InfoTooltip content="Metas calculadas automaticamente pela inteligência de acordo com seus últimos exames e biometrias." align="right" />
+                                        <div className="group relative flex items-center cursor-help p-1 -ml-1">
+                                            <Info className="w-4 h-4 text-zinc-400 dark:text-zinc-500 transition-colors group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />
+                                            <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-zinc-800 dark:bg-zinc-700 text-xs text-zinc-300 dark:text-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[999] pointer-events-none normal-case tracking-normal font-normal">
+                                                Metas calculadas automaticamente pela inteligência de acordo com seus últimos exames e biometrias.
+                                            </div>
+                                        </div>
                                     </div>
                                     {dynamicGoals.map((g, i) => <GoalCard key={i} {...g} />)}
                                 </div>
@@ -1993,7 +1926,12 @@ const Progress = () => {
                                 <div className="flex items-center gap-4 relative">
                                     <BrainCircuit className="w-5 h-5 text-cyan-500" />
                                     <h3 className="text-sm font-black uppercase tracking-[0.2em] text-zinc-500">Insights Estratégicos da Sentinela</h3>
-                                    <InfoTooltip content="Estratégias geradas em tempo real por análise matemática avançada do seu quadro nutricional e fisiológico." />
+                                    <div className="group relative flex items-center cursor-help p-1 -ml-1">
+                                        <Info className="w-4 h-4 text-zinc-400 dark:text-zinc-500 transition-colors group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />
+                                        <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-zinc-800 dark:bg-zinc-700 text-xs text-zinc-300 dark:text-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[999] pointer-events-none normal-case tracking-normal font-normal">
+                                            Estratégias geradas em tempo real por análise matemática avançada do seu quadro nutricional e fisiológico.
+                                        </div>
+                                    </div>
                                     <div className="h-px flex-1 bg-zinc-100 dark:bg-white/5" />
                                 </div>
                                 <CorrelationInsights

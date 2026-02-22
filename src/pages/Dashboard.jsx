@@ -113,7 +113,7 @@ const Dashboard = () => {
 
         const fetchInsights = async () => {
             try {
-                const data = await generateHealthInsights();
+                const data = await generateHealthInsights({ context: 'dashboard' });
                 setInsights(data);
             } catch (error) {
                 console.error("Erro ao carregar insights:", error);
@@ -203,6 +203,7 @@ const Dashboard = () => {
                                 status: problemCount > 0 ? `${problemCount} marcador${problemCount > 1 ? 'es' : ''}` : 'Tudo normal',
                                 onClick: () => { setHealthFilter('problems'); },
                             },
+                            // eslint-disable-next-line no-unused-vars
                         ].map(({ label, icon: Icon, color, bg, status, onClick }) => (
                             <button
                                 key={label}
@@ -228,8 +229,8 @@ const Dashboard = () => {
                         <h2 className="text-xl font-bold text-zinc-900 dark:text-text-primary whitespace-nowrap">
                             🧬 Saúde ({filteredHealthMetrics.length})
                         </h2>
-                        <div className="flex items-center gap-2 w-full md:w-auto">
-                            <div className="flex items-center gap-1 p-1.5 bg-zinc-100 dark:bg-bg-secondary rounded-xl border border-zinc-200 dark:border-border-subtle shadow-inner">
+                        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div className="flex items-center p-1 bg-zinc-100/80 dark:bg-zinc-900/80 rounded-xl border border-zinc-200/50 dark:border-zinc-800 shadow-inner">
                                 {[
                                     { id: 'all', label: 'Geral' },
                                     { id: 'problems', label: `Problemas (${problemCount})` }
@@ -237,24 +238,31 @@ const Dashboard = () => {
                                     <button
                                         key={opt.id}
                                         onClick={() => setHealthFilter(opt.id)}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${healthFilter === opt.id
-                                            ? 'bg-white dark:bg-zinc-700 text-cyan-600 dark:text-cyan-400 shadow-sm border border-zinc-100 dark:border-zinc-600'
-                                            : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                                        className={`relative px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all z-10 ${healthFilter === opt.id
+                                            ? 'text-cyan-700 dark:text-cyan-300 font-bold'
+                                            : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400'
                                             }`}
                                     >
+                                        {healthFilter === opt.id && (
+                                            <motion.div
+                                                layoutId="dashboardHealthFilterBg"
+                                                className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-zinc-200/50 dark:border-zinc-700 -z-10"
+                                                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                            />
+                                        )}
                                         {opt.label}
                                     </button>
                                 ))}
                             </div>
-                            <div className="relative flex-1 max-w-[240px]">
+                            <div className="relative group flex-1 md:flex-none">
+                                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-500/50 group-focus-within:text-cyan-500 transition-colors" />
                                 <input
                                     type="text"
-                                    placeholder="Buscar exame..."
+                                    placeholder="..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-2 bg-zinc-50 dark:bg-bg-secondary border border-zinc-200 dark:border-border-subtle rounded-xl text-sm text-zinc-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
+                                    className="pl-9 pr-4 py-2 bg-white/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 transition-all w-full md:w-40 md:focus:w-56 dark:text-white shadow-sm placeholder:text-zinc-400"
                                 />
-                                <TrendingUp className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
                             </div>
                         </div>
                     </div>

@@ -2010,23 +2010,27 @@ function buildInsightFacts({ latestExam, measurement, plan, todayMeals }) {
         const status = String(b?.status || '').toLowerCase();
         if (!['high', 'low', 'normal'].includes(status)) return;
         const id = formatInsightId('exam', b?.name);
+        const statusPt = status === 'normal' ? 'NORMAL' : status === 'high' ? 'ALTO' : 'BAIXO';
         facts.push({
             id,
             domain: 'exam',
             severity: status === 'normal' ? 'info' : 'alert',
             status,
-            text: `${b?.name}: ${b?.value} ${b?.unit || ''} (referência: ${b?.reference || 'não informada'})`,
+            text: `[STATUS ${statusPt}] ${b?.name}: ${b?.value} ${b?.unit || ''} (referência: ${b?.reference || 'não informada'})`,
         });
     });
 
     const measurementData = measurement?.analysis?.measurements || measurement?.analysis || {};
     const bmi = measurement?.analysis?.bmi;
     if (bmi?.value !== undefined && bmi?.value !== null) {
+        let valStr = String(bmi.value).replace(',', '.');
+        const val = parseFloat(valStr.match(/[\d.]+/)?.[0] || '0');
+        const isAlert = val > 0 && (val < 18.5 || val >= 25);
         facts.push({
             id: 'measurement:bmi',
             domain: 'measurement',
-            severity: 'info',
-            status: 'normal',
+            severity: isAlert ? 'alert' : 'info',
+            status: isAlert ? (val >= 25 ? 'high' : 'low') : 'info',
             text: `IMC atual: ${bmi.value}${bmi.classification ? ` (${bmi.classification})` : ''}`,
         });
     }
@@ -2035,7 +2039,7 @@ function buildInsightFacts({ latestExam, measurement, plan, todayMeals }) {
             id: 'measurement:body-fat',
             domain: 'measurement',
             severity: 'info',
-            status: 'normal',
+            status: 'info',
             text: `Gordura corporal: ${measurementData.bodyFat.value}${measurementData.bodyFat.unit ? ` ${measurementData.bodyFat.unit}` : ''}`,
         });
     }
@@ -2044,21 +2048,12 @@ function buildInsightFacts({ latestExam, measurement, plan, todayMeals }) {
             id: 'measurement:weight',
             domain: 'measurement',
             severity: 'info',
-            status: 'normal',
+            status: 'info',
             text: `Peso atual: ${measurementData.weight.value}${measurementData.weight.unit ? ` ${measurementData.weight.unit}` : ''}`,
         });
     }
 
     const dailyMacros = plan?.analysis?.dailyMacros || null;
-    if (dailyMacros && Object.keys(dailyMacros).length > 0) {
-        facts.push({
-            id: 'plan:daily-macros',
-            domain: 'plan',
-            severity: 'info',
-            status: 'normal',
-            text: `Plano diário: ${dailyMacros.calories || 0} kcal, proteína ${dailyMacros.protein || 0}g, carbo ${dailyMacros.carbs || 0}g, gordura ${dailyMacros.fats || 0}g`,
-        });
-    }
 
     const totals = Array.isArray(todayMeals) && todayMeals.length > 0
         ? todayMeals.reduce((acc, meal) => {
@@ -2070,14 +2065,6 @@ function buildInsightFacts({ latestExam, measurement, plan, todayMeals }) {
         }, { calories: 0, protein: 0, carbs: 0, fats: 0 })
         : { calories: 0, protein: 0, carbs: 0, fats: 0 };
 
-    facts.push({
-        id: 'meals:today-totals',
-        domain: 'meals',
-        severity: 'info',
-        status: 'normal',
-        text: `Consumo hoje: ${Math.round(totals.calories)} kcal, proteína ${Math.round(totals.protein)}g, carbo ${Math.round(totals.carbs)}g, gordura ${Math.round(totals.fats)}g`,
-    });
-
     // Fatos objetivos de aderência ao plano (evitam insight incoerente quando há excesso).
     if (dailyMacros && Object.keys(dailyMacros).length > 0) {
         const comparisons = [
@@ -2087,23 +2074,53 @@ function buildInsightFacts({ latestExam, measurement, plan, todayMeals }) {
             { key: 'fats', label: 'gorduras', unit: 'g' },
         ];
 
+        let overLabels = [];
+        let underLabels = [];
+        let missingConsumption = 0;
+
         comparisons.forEach(({ key, label, unit }) => {
             const goal = Number(dailyMacros[key] || 0);
             if (goal <= 0) return;
             const consumed = Number(totals[key] || 0);
-            const delta = consumed - goal;
-            const over = delta > 0;
-            const status = over ? 'high' : 'normal';
+            if (consumed === 0) missingConsumption++;
 
-            facts.push({
-                id: `nutrition:${key}-balance`,
-                domain: 'meals',
-                severity: over ? 'alert' : 'info',
-                status,
-                text: over
-                    ? `Consumo de ${label} acima da meta: ${Math.round(consumed)}${unit} consumidos vs ${Math.round(goal)}${unit} planejados (excesso de ${Math.round(delta)}${unit}).`
-                    : `Consumo de ${label} dentro da meta: ${Math.round(consumed)}${unit} consumidos de ${Math.round(goal)}${unit}.`,
-            });
+            const delta = consumed - goal;
+
+            if (delta > 0) {
+                overLabels.push(`${label} (+${Math.round(delta)}${unit} além da meta)`);
+            } else {
+                underLabels.push(`${label} dentro da meta`);
+            }
+        });
+
+        // Só gera métricas se realmente houver algum consumo
+        if (missingConsumption < comparisons.length) {
+            if (overLabels.length > 0) {
+                facts.push({
+                    id: `nutrition:macros-balance`,
+                    domain: 'meals',
+                    severity: 'alert',
+                    status: 'high',
+                    text: `Alerta nutricional - Consumo excedeu as metas do plano em: ${overLabels.join(', ')}.`,
+                });
+            } else if (underLabels.length > 0) {
+                facts.push({
+                    id: `nutrition:macros-balance`,
+                    domain: 'meals',
+                    severity: 'info',
+                    status: 'info',
+                    text: `Manutenção de hábitos: Todos os nutrientes acompanhados estão dentro da meta estipulada pelo plano.`,
+                });
+            }
+        }
+    } else if (totals.calories > 0) {
+        // Se não tem plano mas consumiu algo, envia um fato de consumo genérico
+        facts.push({
+            id: 'meals:today-totals',
+            domain: 'meals',
+            severity: 'info',
+            status: 'info',
+            text: `Registro de dieta hoje: consumiu ${Math.round(totals.calories)} kcal.`,
         });
     }
 
@@ -2200,10 +2217,20 @@ function buildInsightsFallbackFromFacts(facts = []) {
 }
 
 function buildInsightFromFact(fact, idPrefix = 'fallback-critical') {
+    let alertTitle = 'Alerta no seu indicador';
+    const domain = (fact.domain || '').toLowerCase();
+    if (domain.includes('nutrition') || domain.includes('diet')) {
+        alertTitle = 'Atenção ao seu consumo atual';
+    } else if (domain.includes('clinic') || domain.includes('biomarker') || domain.includes('blood')) {
+        alertTitle = 'Atenção ao marcador clínico';
+    } else if (domain.includes('anthropometric') || domain.includes('body')) {
+        alertTitle = 'Atenção à sua medida física';
+    }
+
     return {
         id: `${idPrefix}:${fact.id}`,
         type: fact.severity === 'alert' ? 'warning' : 'tip',
-        title: fact.severity === 'alert' ? 'Atenção ao seu consumo atual' : 'Resumo do seu dado atual',
+        title: fact.severity === 'alert' ? alertTitle : 'Resumo do seu dado atual',
         description: String(fact.text || '').slice(0, 150),
         factId: fact.id,
         domain: fact.domain || 'other',
@@ -2324,7 +2351,17 @@ function normalizeInsightByFact(insight, fact) {
     if (fact.severity === 'alert') {
         next.type = 'warning';
         if (saysNormal) {
-            next.title = 'Atenção ao seu consumo atual';
+            let alertTitle = 'Alerta no seu indicador';
+            const domain = (fact.domain || '').toLowerCase();
+            if (domain.includes('nutrition') || domain.includes('diet')) {
+                alertTitle = 'Atenção ao seu consumo atual';
+            } else if (domain.includes('clinic') || domain.includes('biomarker') || domain.includes('blood')) {
+                alertTitle = 'Atenção ao marcador clínico';
+            } else if (domain.includes('anthropometric') || domain.includes('body')) {
+                alertTitle = 'Atenção à sua medida física';
+            }
+
+            next.title = alertTitle;
             next.description = fact.text.slice(0, 150);
         }
     }
@@ -2336,7 +2373,7 @@ function normalizeInsightByFact(insight, fact) {
     return next;
 }
 
-export async function generateHealthInsights() {
+export async function generateHealthInsights({ context = 'dashboard' } = {}) {
     let factsCache = [];
     try {
         await getAuthenticatedEmail();
@@ -2361,27 +2398,57 @@ export async function generateHealthInsights() {
         factsCache = facts;
         if (facts.length === 0) return [];
 
-        // 3. Chamar IA para sintetizar insights APENAS dos fatos existentes
-        const promptReview = `Você é um especialista em saúde e longevidade. Gere insights SOMENTE com base nos fatos fornecidos.
-                    JSON estruturado:
-                    {
-                      "insights": [
-                        {
-                          "id": "string único",
-                          "type": "positive" | "warning" | "tip",
-                          "title": "Título curto",
-                          "description": "Descrição de no máximo 150 caracteres",
-                          "factId": "id de um fato de entrada usado no insight"
-                        }
-                      ]
-                    }
-                    Regras obrigatórias:
-                    - Use EXATAMENTE 3 insights.
-                    - Priorize cobertura dos domínios disponíveis: alimentação (plano/refeições), medidas e exames.
-                    - Se houver fatos desses 3 domínios, inclua pelo menos 1 insight de cada domínio.
-                    - Todo insight DEVE referenciar factId válido.
-                    - NÃO invente qualquer métrica que não exista nos fatos.
-                    Retorne APENAS o JSON.`;
+        // 3. Selecionar o prompt adequado segundo o contexto
+        let promptReview = '';
+        if (context === 'progress') {
+            promptReview = `Você é um Especialista em Tendência e Evolução de Saúde. Sua análise deve focar na progressão temporal e no impacto das mudanças. Identifique se o usuário está melhorando, mantendo estabilidade ou necessitando de atenção corretiva.
+Mantenha um tom encorajador, porém técnico.
+Gere insights SOMENTE com base nos fatos fornecidos na entrada.
+JSON estruturado:
+{
+  "insights": [
+    {
+      "id": "string única",
+      "type": "positive" | "warning" | "tip",
+      "title": "Título focado em evolução ou tendência (curto)",
+      "description": "Análise prática e construtiva apontando próximos passos lógicos. Máx 150 chars.",
+      "factId": "id de um fato de entrada usado no insight"
+    }
+  ]
+}
+Regras OBRIGATÓRIAS (Punição severa se descumpridas):
+- Use EXATAMENTE 3 insights.
+- Priorize cobertura dos domínios disponíveis: alimentação, medidas e exames. NUNCA gere 2 ou 3 insights para o mesmo tema/domínio (ex: não gere 3 insights só de dieta).
+- Todo insight DEVE referenciar um factId válido da entrada.
+- NUNCA declare que um valor está "alto", "elevado" ou "em risco" se o fato indicar [STATUS NORMAL].
+- ABSOLUTAMENTE PROIBIDO inventar métricas, exames (ex: triglicerídeos) ou diagnósticos que não estejam EXPLICITAMENTE nos fatos fornecidos.
+- Se os dados estiverem saudáveis/normais, crie recomendações de manutenção (tip) ou parabenize (positive), mas JAMAIS invente um problema (warning).
+Retorne APENAS o JSON.`;
+        } else {
+            promptReview = `Você é uma Sentinela Analítica de Saúde, focada em alertar sobre o estado do momento e identificar desalinhamentos críticos imediatos.
+Sua análise deve ser direta, tática e alertar rapidamente para situações de risco (se houverem) ou reforçar o status atual de forma objetiva.
+Gere insights SOMENTE com base nos fatos fornecidos na entrada.
+JSON estruturado:
+{
+  "insights": [
+    {
+      "id": "string única",
+      "type": "positive" | "warning" | "tip",
+      "title": "Título com foco no estado macro ou alerta (curto)",
+      "description": "Explicação direta do risco ou validação do momento atual. Máx 150 chars.",
+      "factId": "id de um fato de entrada usado no insight"
+    }
+  ]
+}
+Regras OBRIGATÓRIAS (Punição severa se descumpridas):
+- Use EXATAMENTE 3 insights.
+- Priorize cobertura dos domínios disponíveis: alimentação, medidas e exames. NUNCA gere 2 ou 3 insights repetitivos (ex: apenas alertas alimentares).
+- Todo insight DEVE referenciar um factId válido da entrada.
+- NUNCA declare que um valor está "alto", "elevado", "ruim" ou apresenta "risco" se o fato indicar [STATUS NORMAL].
+- ABSOLUTAMENTE PROIBIDO inventar métricas, exames ou problemas que não estejam EXPLICITAMENTE nos fatos fornecidos.
+- Se os dados estiverem saudáveis/normais, os insights devem ser de validação e manutenção (positive/tip).
+Retorne APENAS o JSON.`;
+        }
 
         const userEmail = await getAuthenticatedEmail();
 

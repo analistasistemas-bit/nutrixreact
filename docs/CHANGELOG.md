@@ -5,6 +5,19 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.3.0] - 2026-02-21
+
+### Adicionado
+- **Progress**: Reformulação completa da aba "Resumo" com novos widgets dinâmicos de saúde.
+- **Progress**: Adição do `HealthScoreGauge` para exibir uma nota geral de saúde baseada na proporção de marcadores normais vs alertas no último exame.
+- **Progress**: Adição do `ConsistencyHeatmap` mostrando o streak de registros nos últimos 28 dias.
+- **Progress**: Adição do `QuickStatsBanner` para exibir estatísticas rápidas consolidadas (Total de marcadores, Fora do ideal, Último exame, Avaliação Física).
+- **Progress**: Adição do `PeriodComparison` para comparar indicadores cruciais (Peso, Gordura e Principal Marcador ruim) entre a primeira e última avaliação/exame.
+- **Progress**: Adição do `GoalCard` para elencar metas ativas baseadas no progresso evolutivo do usuário.
+- **Progress**: Adição do `CriticalAlerts` para dar visibilidade destacada a biomarcadores que estão fora das referências normais (`high` ou `low`).
+
+---
+
 ## [1.2.0] - 2026-02-20
 
 ### Adicionado

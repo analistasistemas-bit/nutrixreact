@@ -47,7 +47,7 @@ Backlog técnico detalhado com todas as tarefas de evolução do projeto. Basead
 
 ---
 
-## 📈 Épico 4: Hub de Progresso ✅ CONCLUÍDO (v1.2.0)
+## 📈 Épico 4: Hub de Progresso ✅ CONCLUÍDO (v1.3.0)
 
 | Task ID | Descrição | Prioridade | Status |
 | :--- | :--- | :--- | :--- |
@@ -58,6 +58,8 @@ Backlog técnico detalhado com todas as tarefas de evolução do projeto. Basead
 | ELT-405 | Progress: seletor de período (7D / 30D / 3M / 1A) | P1 | ✅ |
 | ELT-406 | Progress: filtragem real de dados por período | P1 | ✅ |
 | ELT-407 | Food: barra de macros diária com progresso vs meta | P1 | ✅ |
+| ELT-408 | Progress: Reformulação da aba "Resumo" com Gauge de Saúde e Heatmap de Consistência | P1 | ✅ |
+| ELT-409 | Progress: Banner de stats rápidos, comparações parciais e metas ativas geradas pela IA | P1 | ✅ |
 
 ---
 

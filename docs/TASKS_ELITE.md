@@ -72,13 +72,15 @@ Este arquivo serve como controle de execução para as melhorias do NutixoApp.
 
 ---
 
-## 📈 [Épico 6] Progress Hub — ✅ CONCLUÍDO (v1.2.0)
+## 📈 [Épico 6] Progress Hub — ✅ CONCLUÍDO (v1.3.0)
 
 - [x] Seletor de período visual (7D / 30D / 3M / 1A) com filtragem real
 - [x] Filtragem de biomarcadores e medidas por período selecionado
 - [x] Timeline de exames por data em Labs
 - [x] Badge "Novo" para exames recentes (< 7 dias)
 - [x] Delta (▲▼) entre último e penúltimo resultado de cada biomarcador
+- [x] Reformulação da aba Resumo com Dashboard rico (HealthScore, Constância, Metas ativas)
+- [x] Remoção de falsos relatórios da IA focando em relatórios visuais úteis (Heatmap, Comparativos)
 
 ---
 

@@ -1,7 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
-import { User, Target, ShieldAlert, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { User, Target, ShieldAlert, Sparkles, Loader2, RefreshCw, ChevronDown, Check } from 'lucide-react';
 import { getLatestMeasurements, generateNutritionPlanByAI } from '../../services/aiService';
+
+const CustomSelect = ({ label, name, options, value, onChange, placeholder = "Selecione..." }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <div className="relative">
+            {label && <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">{label}</label>}
+            <div
+                className="w-full bg-gray-50 dark:bg-bg-tertiary border border-gray-200 dark:border-border-subtle rounded-xl px-4 py-2 cursor-pointer flex items-center justify-between transition-all hover:border-cyan-500/50 shadow-sm h-[42px]"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <span className={value ? "text-gray-900 dark:text-text-primary text-sm" : "text-gray-400 text-sm"}>
+                    {options.find(o => (o.value || o) === value)?.label || value || placeholder}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            <AnimatePresence>
+                {isOpen && (
+                    <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+                        <motion.div
+                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                            transition={{ duration: 0.2 }}
+                            className="absolute z-50 w-full mt-2 bg-white/90 dark:bg-bg-elevated/90 backdrop-blur-xl border border-gray-200/50 dark:border-border-subtle rounded-2xl shadow-xl overflow-hidden p-1 backdrop-saturate-150"
+                        >
+                            {options.map((opt) => {
+                                const optValue = opt.value ?? opt;
+                                const optLabel = opt.label ?? opt;
+                                const isSelected = value === optValue;
+
+                                return (
+                                    <div
+                                        key={optValue}
+                                        onClick={() => {
+                                            onChange({ target: { name, value: optValue } });
+                                            setIsOpen(false);
+                                        }}
+                                        className={`px-3 py-2.5 cursor-pointer text-sm font-medium transition-all rounded-xl flex items-center justify-between ${isSelected
+                                                ? 'bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-bg-tertiary/50'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {optLabel}
+                                        </div>
+                                        {isSelected && (
+                                            <Check className="w-4 h-4 text-cyan-500 shrink-0" />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 const CreatePlanWizard = ({ onGenerated, onCancel }) => {
     const [step, setStep] = useState(1);
@@ -197,14 +257,17 @@ const CreatePlanWizard = ({ onGenerated, onCancel }) => {
                                                 <p className="mt-1 text-xs text-red-500">{fieldErrors.age}</p>
                                             )}
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-1">Sexo (Biológico)</label>
-                                            <select name="gender" value={formData.gender} onChange={handleChange}
-                                                className="w-full bg-gray-50 dark:bg-bg-tertiary border border-gray-200 dark:border-border-subtle rounded-xl px-4 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-gray-900 dark:text-text-primary h-[42px]">
-                                                <option value="">Selecione...</option>
-                                                <option value="Masculino">Masculino</option>
-                                                <option value="Feminino">Feminino</option>
-                                            </select>
+                                        <div className="z-40 relative">
+                                            <CustomSelect
+                                                label="Sexo (Biológico)"
+                                                name="gender"
+                                                value={formData.gender}
+                                                onChange={handleChange}
+                                                options={[
+                                                    { value: 'Masculino', label: 'Masculino' },
+                                                    { value: 'Feminino', label: 'Feminino' }
+                                                ]}
+                                            />
                                             {fieldErrors.gender && (
                                                 <p className="mt-1 text-xs text-red-500">{fieldErrors.gender}</p>
                                             )}
@@ -245,25 +308,33 @@ const CreatePlanWizard = ({ onGenerated, onCancel }) => {
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-2">Nível de atividade física semanal</label>
-                                        <select name="activityLevel" value={formData.activityLevel} onChange={handleChange}
-                                            className="w-full bg-gray-50 dark:bg-bg-tertiary border border-gray-200 dark:border-border-subtle rounded-xl px-4 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-gray-900 dark:text-text-primary">
-                                            <option value="Sedentário">Sedentário (Nenhuma)</option>
-                                            <option value="Leve">Leve (1-2x por semana)</option>
-                                            <option value="Moderado">Moderado (3-4x por semana)</option>
-                                            <option value="Intenso">Intenso (5+ vezes por semana)</option>
-                                        </select>
+                                    <div className="z-30 relative">
+                                        <CustomSelect
+                                            label="Nível de atividade física semanal"
+                                            name="activityLevel"
+                                            value={formData.activityLevel}
+                                            onChange={handleChange}
+                                            options={[
+                                                { value: 'Sedentário', label: 'Sedentário (Nenhuma)' },
+                                                { value: 'Leve', label: 'Leve (1-2x por semana)' },
+                                                { value: 'Moderado', label: 'Moderado (3-4x por semana)' },
+                                                { value: 'Intenso', label: 'Intenso (5+ vezes por semana)' }
+                                            ]}
+                                        />
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-2">Estilo / Orçamento</label>
-                                        <select name="budget" value={formData.budget} onChange={handleChange}
-                                            className="w-full bg-gray-50 dark:bg-bg-tertiary border border-gray-200 dark:border-border-subtle rounded-xl px-4 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-gray-900 dark:text-text-primary">
-                                            <option value="Baixo Custo">Simples / Popular (Arroz, Frango, Ovo, Feijão)</option>
-                                            <option value="Padrão">Padrão</option>
-                                            <option value="Livre">Variada (Salmão, Castanhas, Suplementos)</option>
-                                        </select>
+                                    <div className="z-20 relative">
+                                        <CustomSelect
+                                            label="Estilo / Orçamento"
+                                            name="budget"
+                                            value={formData.budget}
+                                            onChange={handleChange}
+                                            options={[
+                                                { value: 'Baixo Custo', label: 'Simples / Popular (Arroz, Frango, Ovo, Feijão)' },
+                                                { value: 'Padrão', label: 'Padrão' },
+                                                { value: 'Livre', label: 'Variada (Salmão, Castanhas, Suplementos)' }
+                                            ]}
+                                        />
                                     </div>
 
                                 </div>
