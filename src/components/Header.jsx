@@ -62,6 +62,19 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
         confirmPhrase.trim().toUpperCase() === RESET_CONFIRMATION_TEXT &&
         confirmPassword.trim().length >= 6;
 
+    const handleLogout = async () => {
+        console.log('Iniciando logout...');
+        try {
+            setShowProfileMenu(false);
+            setShowMobileProfile(false);
+            await onLogout();
+            console.log('Logout concluído no AuthContext, redirecionando...');
+            navigate('/login');
+        } catch (error) {
+            console.error('Erro ao processar logout:', error);
+        }
+    };
+
     const handleDeleteData = async () => {
         if (!isDeleteConfirmationValid || isDeletingData) return;
 
@@ -75,7 +88,7 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
             });
 
             closeDeleteModal();
-            await onLogout();
+            await handleLogout();
         } catch (error) {
             setDeleteError(error?.message || 'Falha ao excluir dados. Tente novamente.');
         } finally {
@@ -336,7 +349,7 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                                         </span>
                                                     </button>
                                                     <button
-                                                        onClick={onLogout}
+                                                        onClick={handleLogout}
                                                         className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors group"
                                                     >
                                                         <div className="p-1.5 bg-red-50 dark:bg-red-900/40 rounded-lg group-hover:bg-white dark:group-hover:bg-red-900/60 group-hover:shadow-sm transition-all">
@@ -595,7 +608,7 @@ const Header = ({ user, onLogout, notifications, unreadCount, onMarkRead, onMark
                                         </span>
                                     </button>
                                     <button
-                                        onClick={onLogout}
+                                        onClick={handleLogout}
                                         className="w-full bg-red-50 text-red-600 font-bold p-4 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-transform hover:bg-red-100"
                                     >
                                         <LogOut className="w-5 h-5" />

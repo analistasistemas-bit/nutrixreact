@@ -130,11 +130,6 @@ const Login = ({ onLogin }) => {
             });
 
             if (error) {
-                if (error.message === 'Invalid login credentials' && isDev) {
-                    console.warn('DEV: Bypass login simulado');
-                    handleLoginSuccess({ email, user_metadata: { name: 'Diego (Dev)' } }, null);
-                    return;
-                }
                 // Mensagem amigável para e-mail não confirmado
                 if (error.message === 'Email not confirmed') {
                     setError('E-mail ainda não confirmado. Verifique sua caixa de entrada e clique no link de confirmação.');

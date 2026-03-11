@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
@@ -17,9 +17,9 @@ import ReloadPrompt from './components/ReloadPrompt';
 
 const AppContent = () => {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
+  
   const handleLogin = React.useCallback((userData, token) => {
     login(userData, token);
-    window.history.replaceState(null, '', '/');
   }, [login]);
 
   // Splash enquanto verifica sessão
@@ -31,15 +31,6 @@ const AppContent = () => {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <>
-        <Login onLogin={handleLogin} />
-        <ReloadPrompt />
-      </>
-    );
-  }
-
   const displayUser = user || {
     name: 'Usuário',
     email: 'usuario@nutrixo.com',
@@ -47,29 +38,54 @@ const AppContent = () => {
   };
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<MainLayout user={displayUser} onLogout={logout} />}>
-          <Route index element={<Dashboard />} />
-          <Route path="labs" element={<Labs />} />
-          <Route path="measurements" element={<Measurements />} />
-          <Route path="progress" element={<Progress />} />
-          <Route path="nutrition-plan" element={<NutritionPlan />} />
-          <Route path="food" element={<Food />} />
-          <Route path="gamer-profile" element={<GamerProfile />} />
-          <Route path="account/profile" element={<AccountProfile />} />
-          <Route path="account/settings" element={<AccountSettings />} />
-        </Route>
-      </Routes>
-      <ReloadPrompt />
-    </BrowserRouter>
+    <Routes>
+      {/* Rota de Login: Redireciona para / se já estiver autenticado */}
+      <Route 
+        path="/login" 
+        element={
+          !isAuthenticated ? (
+            <Login onLogin={handleLogin} />
+          ) : (
+            <Navigate to="/" replace />
+          )
+        } 
+      />
+
+      {/* Rotas Protegidas: Redirecionam para /login se não estiver autenticado */}
+      <Route 
+        path="/" 
+        element={
+          isAuthenticated ? (
+            <MainLayout user={displayUser} onLogout={logout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      >
+        <Route index element={<Dashboard />} />
+        <Route path="labs" element={<Labs />} />
+        <Route path="measurements" element={<Measurements />} />
+        <Route path="progress" element={<Progress />} />
+        <Route path="nutrition-plan" element={<NutritionPlan />} />
+        <Route path="food" element={<Food />} />
+        <Route path="gamer-profile" element={<GamerProfile />} />
+        <Route path="account/profile" element={<AccountProfile />} />
+        <Route path="account/settings" element={<AccountSettings />} />
+      </Route>
+
+      {/* Catch-all: Volta para o início */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 };
 
 const App = () => (
-  <AuthProvider>
-    <AppContent />
-  </AuthProvider>
+  <BrowserRouter>
+    <AuthProvider>
+      <AppContent />
+      <ReloadPrompt />
+    </AuthProvider>
+  </BrowserRouter>
 );
 
 export default App;
